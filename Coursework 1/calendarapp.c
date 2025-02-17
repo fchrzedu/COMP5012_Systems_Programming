@@ -5,21 +5,18 @@ typedef struct{
     int day;
     int month;
     int year;
-    char description[50];
+    char description[100]; //100 char limit
 } CalEntry;
 
 void readKeyboard(){
     CalEntry new_entry;
     printf("Please enter date for new calendar entry in format DD/MM/YYYY> ");
-    scanf("%d/%d/%d", &new_entry.day, &new_entry.month, &new_entry.year);
+    scanf("%d/%d/%d", &new_entry.day, &new_entry.month, &new_entry.year); //added space after delim to consume newline
+    printf("\nEnter description for date entered above> ");
 
-    getchar();  // To consume the newline character left by scanf after reading the date
+    gets(*new_entry.description);
 
-    printf("\nPlease now enter description for such date> ");
-    fgets(new_entry.description, sizeof(new_entry.description), stdin); 
-
-    // Print the new entry
-    printf("Event on %02d/%02d/%04d: %s\n", new_entry.day, new_entry.month, new_entry.year, new_entry.description);
+    printf("The date entered is %d/%d/%d, whereas the desc is %s\n",new_entry.day,new_entry.month,new_entry.year,new_entry.description);
 
     
 }
