@@ -16,13 +16,26 @@ void readKeyboard(){
     printf("Now please enter description for such date> ");
     fgets(new_entry.description, sizeof(new_entry.description),stdin);
     
-    printf("%s",new_entry.description);
-
-    
+    printf("%s",new_entry.description);    
+}
+void createFile(){
+    FILE *f = fopen("entries.txt","w");
+    if(f==NULL){printf("Unable to create file.\n");}
+    else{printf("Created entries.txt succesfully.\n");fclose(f);}
+}
+void readFile(){
+    FILE *fptr = fopen("entries.txt", "r"); 
+    if(fptr == NULL){
+        printf("File entries.txt not found, creating a new one...\n");
+        createFile();
+        return;
+    }
+    // File exists, proceed to read
+    fclose(fptr);
 }
 bool menu(){
     int choice = 0;
-    printf("MENU FOR COMMANDS:\n");
+    printf("\nMENU FOR COMMANDS:\n"); // done - needs bound checking
     printf("1 Read from keyboard\n");
     printf("2 Read input from file\n");
     printf("4 View all calendar entries\n");
@@ -42,7 +55,7 @@ bool menu(){
                 readKeyboard();
                 break;
             case 2:
-               // readFile();
+                readFile();
                 break;
             default:
             break;
