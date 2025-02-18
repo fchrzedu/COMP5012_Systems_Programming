@@ -11,12 +11,18 @@ typedef struct{
 void readKeyboard(){
     CalEntry new_entry;
     printf("Please enter date for new calendar entry in format DD/MM/YYYY> ");
-    scanf("%d/%d/%d", &new_entry.day, &new_entry.month, &new_entry.year); //added space after delim to consume newline
+    scanf("%d/%d/%d", &new_entry.day, &new_entry.month, &new_entry.year); 
+    while(new_entry.day > 31 || new_entry.day < 00 || new_entry.month > 12 || new_entry.month < 01 || new_entry.year < 0000){ // bound checking
+        printf("Incorrect date, try again.\n");
+        printf("Please enter date for new calendar entry in format DD/MM/YYYY> ");
+        scanf("%d/%d/%d", &new_entry.day, &new_entry.month, &new_entry.year); 
+    }
     getchar(); //using fgets, need to consume newline char
-    printf("Now please enter description for such date> ");
+    printf("Now please enter description for such date> \n");
     fgets(new_entry.description, sizeof(new_entry.description),stdin);
     
-    printf("%s",new_entry.description);    
+    printf("Appending %d/%d/%d '%s' to entries.txt...", new_entry.day, new_entry.month, new_entry.year, new_entry.description);
+    //add file append here
 }
 void createFile(){
     FILE *f = fopen("entries.txt","w");
@@ -58,6 +64,7 @@ bool menu(){
                 readFile();
                 break;
             default:
+            printf("Not a valid choice, try again\n");
             break;
 
 
