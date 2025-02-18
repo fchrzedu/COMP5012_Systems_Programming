@@ -12,11 +12,11 @@ void readKeyboard(){
     CalEntry new_entry;
     printf("Please enter date for new calendar entry in format DD/MM/YYYY> ");
     scanf("%d/%d/%d", &new_entry.day, &new_entry.month, &new_entry.year); //added space after delim to consume newline
-    printf("\nEnter description for date entered above> ");
-
-    gets(*new_entry.description);
-
-    printf("The date entered is %d/%d/%d, whereas the desc is %s\n",new_entry.day,new_entry.month,new_entry.year,new_entry.description);
+    getchar(); //using fgets, need to consume newline char
+    printf("Now please enter description for such date> ");
+    fgets(new_entry.description, sizeof(new_entry.description),stdin);
+    
+    printf("%s",new_entry.description);
 
     
 }
