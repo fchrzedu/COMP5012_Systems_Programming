@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h> // used for isdigit 
+
 typedef struct {
     int day;
     int month;
@@ -38,28 +39,29 @@ void readKeyboard() {
     CalEntry new_entry;
     char date_i[11];//Create array to store input
 
-    printf("Please enter date for new calendar entry in format DD/MM/YYYY\n>>");
+    printf("-->Please enter date for new calendar entry in format DD/MM/YYYY\n>>");
     fgets(date_i,sizeof(date_i),stdin);    
     date_i[strcspn(date_i, "\n")] = 0;//remove newline from fgets - stackoverf
     
+    
 
     while(!isValidFormat(date_i)){ // calls func to check format
-        printf("Invalid format, enter date in format DD/MM/YYYY\n>>");
+        printf("-->Invalid format, enter date in format DD/MM/YYYY\n>>");
         fgets(date_i,sizeof(date_i),stdin);
         date_i[strcspn(date_i, "\n")] = 0;        
     }
     sscanf(date_i, "%d/%d/%d", &new_entry.day, &new_entry.month, &new_entry.year);
     while(!isValidDate(new_entry.day, new_entry.month, new_entry.year))
     {
-        printf("Incorrect date, try again.\n");
-        printf("Please enter date for new calendar entry in format DD/MM/YYYY\n>>");
+        printf("-->Incorrect date, try again.\n");
+        printf("-->Please enter date for new calendar entry in format DD/MM/YYYY\n>>");
         fgets(date_i,sizeof(date_i),stdin);
         date_i[strcspn(date_i,"/n")] = 0; // remove newline
         sscanf(date_i, "%d/%d/%d", &new_entry.day, &new_entry.month, &new_entry.year);
 
     }
     getchar();
-    printf("Now please enter description for such date\n>>");
+    printf("-->Now please enter description for such date\n>>");
     fgets(new_entry.description, sizeof(new_entry.description), stdin); // get new entry, check its bound size and use stdin as keyboard stream    
    
     /*
@@ -75,14 +77,14 @@ void readKeyboard() {
     FILE *fptr;
     fptr = fopen("entries.txt", "a"); // Open the file for appending
     if (fptr == NULL) {
-        printf("Error opening file for appending.\n");
+        printf("-->Error opening file for appending.\n");
         return;
     }
 
     fprintf(fptr, "%02d/%02d/%04d, %s\n", new_entry.day, new_entry.month, new_entry.year, new_entry.description);
     fclose(fptr); // Close the file after appending
 
-    printf("Entry successfully added to the file.\n");
+    printf("-->Entry successfully added to the file.\n");
 }
 
 
@@ -92,7 +94,7 @@ void readFile() {
     FILE *fptr;
     fptr = fopen("entries.txt", "r");
     if (fptr == NULL) {
-        printf("File doesn't exist! Please create entries first.\n");
+        printf("-->File doesn't exist! Please create entries first.\n");
         return;
     }
     char line_buffer[150];
@@ -106,23 +108,22 @@ void readFile() {
         sscanf(line_buffer, "%d/%d/%d, %[^\n]", &entr.day, &entr.month, &entr.year, entr.description);
         printf("%02d/%02d/%04d - %s\n", entr.day, entr.month, entr.year, entr.description); // Print entry
     }
-    if(is_empty){printf("No entries.\n");}
+    if(is_empty){printf("-->No entries.\n");}
 
 }
 
-bool deleteEntry()[
-    return false;
-]
+
+
 void modifyEntry() {
-    char[1] choice;
+    char date[11];
     FILE *fptr;
     fptr = fopen("entries.txt", "r+"); // Open file for reading and writing
     if (fptr == NULL) {
-        printf("File doesn't exist! Please create entries first.\n");
+        printf("-->File doesn't exist! Please create entries first.\n");
         return;
     }
 
-    CalEntry entries[365]; // Assuming there will be no more a years of entries
+    CalEntry entries[365]; // Assuming there will be no more then a years of entries
     int entryCount = 0;
     char line_buffer[150];
     while (fgets(line_buffer, sizeof(line_buffer), fptr)) {
@@ -132,21 +133,39 @@ void modifyEntry() {
 
     fclose(fptr); // Close the file after reading
 
-    printf("Do you wish to modify a date description (M) or delete an entry (D)?\n>>");
-
+    
    
 
-    printf("Enter the date (DD/MM/YYYY) of the entry you want to modify: ");
+    printf("-->Enter the date (DD/MM/YYYY) of the entry you want to modify: ");
     int day, month, year;
-    scanf("%d/%d/%d", &day, &month, &year);
+    fgets(date,sizeof(date),stdin);
+    date[strcspn(date, "\n")] = 0;//remove newline from fgets - stackoverflow found
+
+    //check whether modified date format is correct
+    while(!isValidFormat(date)){ 
+        printf("-->Invalid format, enter date in format DD/MM/YYYY\n>>");
+        fgets(date,sizeof(date),stdin);
+        date[strcspn(date, "\n")] = 0;        
+    }
+    sscanf(date, "%d/%d/%d", &day, &month, &year);
+    while(!isValidDate(day, month, year))
+    {
+        printf("-->Incorrect date, try again.\n");
+        printf("-->Please enter date to modify the entry in format DD/MM/YYYY\n>>");
+        fgets(date,sizeof(date),stdin);
+        date[strcspn(date,"/n")] = 0; // remove newline
+        sscanf(date, "%d/%d/%d", &day, &month, &year);
+
+    }
+
     getchar(); // consume newline character
 
     bool found = false;
     for (int i = 0; i < entryCount; i++) {
         if (entries[i].day == day && entries[i].month == month && entries[i].year == year) {
             found = true;
-            printf("Found entry: %02d/%02d/%04d - %s\n", entries[i].day, entries[i].month, entries[i].year, entries[i].description);
-            printf("Enter new description: ");
+            printf("-->Found entry: %02d/%02d/%04d - %s\n", entries[i].day, entries[i].month, entries[i].year, entries[i].description);
+            printf("-->Enter new description: ");
             fgets(entries[i].description, sizeof(entries[i].description), stdin);
             // Remove trailing newline from description
             entries[i].description[strcspn(entries[i].description, "\n")] = '\0';
@@ -155,14 +174,14 @@ void modifyEntry() {
     }
 
     if (!found) {
-        printf("Entry not found.\n");
+        printf("-->Entry not found.\n");
         return;
     }
 
     // Now overwrite the file with modified entries
     fptr = fopen("entries.txt", "w"); // Open the file in write mode to overwrite
     if (fptr == NULL) {
-        printf("Error opening file for writing.\n");
+        printf("-->Error opening file for writing.\n");
         return;
     }
 
@@ -171,13 +190,13 @@ void modifyEntry() {
     }
 
     fclose(fptr); // Close the file after writing
-    printf("Entry modified successfully.\n");
+    printf("-->Entry modified successfully.\n");
 }
 
 bool openCheckFile(FILE **fptr) {
     *fptr = fopen("entries.txt", "r");
     if (*fptr == NULL) {
-        printf("File doesn't exist, creating new file called entries.txt...\n");
+        printf("-->File doesn't exist, creating new file called entries.txt...\n");
         *fptr = fopen("entries.txt", "w");
         if (*fptr == NULL) {
             return false; // File could not be created
@@ -202,7 +221,7 @@ bool menu() {
         case 0:
             return true; // Exit
         case 1:
-            //stops feeding in '1' leftover and the newline
+            //stops feeding in '1' leftover and the newline - loops through int until newline is found
             while(getchar()!='\n');
             readKeyboard();
             break;
@@ -210,6 +229,7 @@ bool menu() {
             readFile();
             break;
         case 3:
+            while(getchar()!='\n');
             modifyEntry();
             break;
         default:
