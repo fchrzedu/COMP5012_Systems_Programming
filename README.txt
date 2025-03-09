@@ -4,8 +4,6 @@ Using C within Minix on a VM
 
 Coded inside VSCode
 
-Coursework 1 focuses on a calendar database management application
-
-1_Hello_World.c = part 1
-myprog.c = part 2
-calendarapp.c = part 3
+Part1 & Part_2 Focus on easy applications and calendar management application
+Part3 focuses on fork() coursework
+Daemonprog = future 80% assessed coursework focusing on a daemon server
