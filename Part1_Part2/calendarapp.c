@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <ctype.h> // used for isdigit 
 
-typedef struct {
+typedef struct { // defines calendar entries
     int day;
     int month;
     int year;
@@ -87,10 +87,7 @@ void readKeyboard() {
     }    
     FILE *fptr;
     fptr = fopen("entries.txt", "a"); // Open the file for appending
-    if (fptr == NULL) {
-        printf("-->Error opening file for appending.\n");
-        return;
-    }
+    
 
     fprintf(fptr, "%02d/%02d/%04d, %s\n", new_entry.day, new_entry.month, new_entry.year, new_entry.description); // 'print' to textfile at new line
     fclose(fptr); // Close the file after appending
@@ -114,7 +111,7 @@ void readFile() {
         while(fgets(line_buffer, sizeof(line_buffer), fptr)){
             is_empty = false;
             CalEntry entr;
-            sscanf(line_buffer, "%d/%d/%d, %[^\n]", &entr.day, &entr.month, &entr.year, entr.description);
+            sscanf(line_buffer, "%d/%d/%d, %[^\n]", &entr.day, &entr.month, &entr.year, entr.description); //  without  %[^\n] I couldn't read whitespaces
             printf("%02d/%02d/%04d - %s\n", entr.day, entr.month, entr.year, entr.description); // Print entry
         }
     }
