@@ -1,10 +1,18 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <unistd.h>
-#include <sys/wait.h> // wait()
-#include <errno.h> // perror
+#include <sys/types.h>
+#include <stdlib.h>
+
+
 
 int main(){
-    printf(">Child process. PID is %d\n",getpid());
-    return 0;
+    pid_t pid = fork();
+    if(pid < 0){ // error
+        perror(">Forking has failed!\n");
+        exit(1);
+    }
+    if(pid==0){
+        printf(">You have succesfully used execl!\n>This is child. My PID is == %d\n",getpid());
+        
+    }
 }

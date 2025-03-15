@@ -1,22 +1,28 @@
 #include <stdio.h>
-#include <sys/types.h>
 #include <unistd.h>
+#include <sys/types.h>
 #include <stdlib.h>
-int main(int argc, char* argv[])
-{
 
-    // make two process which run same
-    // program after this instruction
-    pid_t p = fork();
-    if(p<0){
-      perror("fork fail");
-      return 1;
-    }else if(p==0){ // succesful forking for child if zero
-        printf("Child process PID = %d, Parent process PID = %d\n",getpid(),getppid());
+/*
+1. Checks if forking has failed and throws error along exit code
+2. Prints out child PID and its parent PID
+3. Prints out parent PID, the parents parent PID, and the child PID (fork always stores child PID)
+*/
+
+
+
+int main (){
+    pid_t pid = fork();
+    if(pid < 0){ // error
+        perror(">Forking has failed!\n");
+        exit(1);
     }
-    else{ // not zero and not -ve means parent
-        printf("Parent process PID = %d, Child process PID = %d\n",getppid(),getpid());
+    else if (pid == 0){//child    
+       printf("Child process. My PID == %d, parent PID == %d\n",getpid(),getppid());
     }
-   
+    else{//parent    
+        printf("Parent process. My PID == %d, my parent's PID == %d, child PID == %d\n",getpid(),getppid(),pid);
+    }
+
     return 0;
 }
