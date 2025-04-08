@@ -80,11 +80,14 @@ int main(void)
     /* Listen for incoming connections, 1 connection at a time */
     listen(server_sock, 1);
 
-    while(1){
-        
+    while(1){        
         client_sock = accept(server_sock, NULL, NULL); /* Accept connection */
+        if(client_sock < 0)        {
+            syslog(LOG_ERR, "%s\n", "accept"); 
+            exit(EXIT_FAILURE);
+        }
         send(client_sock, "---Waiting on connection---\n", 30, 0); /* Send message to syslog */
-        send(client_sock, "Hello you have connected to the daemon!\n",40,0 );
+        send(client_sock, "---Hello you have connected to the daemon!\n---",43,0 );
         close(server_sock);
         close(client_sock);
     }
