@@ -18,7 +18,7 @@ int main(){
     }
     else if (pid==0){
         printf(">Child process...\n");
-        execl("./child","child",NULL); // NULL for end of args, call all args (using child), from /child
+        execl("./child","child",NULL); // NULL for no of args, call all args (using child), from /child
         exit(2);
     }else{
         wait(&stat); // have to wait for execl to complete. Without it parent executed incorrectly
