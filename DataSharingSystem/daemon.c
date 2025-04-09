@@ -80,7 +80,7 @@ int main(void)
     /* Listen for incoming connections, 1 connection at a time */
     listen(server_sock, 1);
 
-    while(1){        
+    while(1){ /* Infinite loop, to constantly listen for new connections */  
         client_sock = accept(server_sock, NULL, NULL); /* Accept connection */
         if(client_sock < 0)        {
             syslog(LOG_ERR, "%s\n", "accept"); 
