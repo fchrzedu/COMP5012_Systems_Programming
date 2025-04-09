@@ -1,18 +1,36 @@
-/*
-- Client side socket program.
-- Used to connect to the daemon through the shared library
+// client.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
 
-*/
+int main() {
+    int sock;
+    struct sockaddr_in server;
+    char buffer[1024];
 
-#define SERVER_PORT 9002 /* TCP */
-#define SERVER_ADDR "127.0.0.1" /* Always connects on 127.0.0.1 to daemon*/
-#def
-
-int main(){
-    char ID[256], secret[256], data[1024];
-
-    if(daemonConnection(SERVER_ADDR, SERVER_PORT) != 0){
-        /* if cannot connect to daemon through lib*/
-        
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) {
+        perror("Socket creation error");
+        return 1;
     }
+
+    server.sin_family = AF_INET;
+    server.sin_port = htons(9002);
+    server.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+    if (connect(sock, (struct sockaddr*)&server, sizeof(server)) < 0) {
+        perror("Connection failed");
+        return 1;
+    }
+
+    int bytes;
+    while ((bytes = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
+        buffer[bytes] = '\0';
+        printf("%s", buffer);
+    }
+
+    close(sock);
+    return 0;
 }
