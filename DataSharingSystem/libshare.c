@@ -4,7 +4,7 @@
 #include <syslog.h> /* log() */
 
 #define PORT 9002
-#define DAEMONIP "127.0.0.1" /* Retrieved from telnet localhost 9002*/
+#define LOOPBACK "127.0.0.1" /* Retrieved from telnet localhost 9002*/
 #define BUFFER 1024
 
 
@@ -13,31 +13,25 @@ void log(const char *message){
     syslog(LOG_ERR, "%s", message);
 }
 int daemonConnect(){
-
-    int sock;
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-    if(sock<0){
-        log("Socket creation failed");
-        exit(EXIT_FAILURE);
-    }
-
-    struct sockaddr_in server_address;
-
+    
+    int csock = socket(AF_INET, SOCK_STREAM, 0); /* Create socket */
+    struct sockaddr_in server_address; /* Server address structure */
     server_address.sin_family = AF_INET;
-    server_address.sin_port = htons(PORT); 
-    server_address.sin_addr.s_addr = inet_addr(DAEMONIP); // Replace with the daemon's IP address if different
+    server_address.sin_port = htons(PORT); // port num
+    server_address.sin_addr.s_addr = inet_addr(LOOPBACK); // accept any connections
 
-    if (connect(sock, (struct sockaddr *)&server_address, sizeof(server_address)) < 0) {
-        log("Connection to daemon failed");
-        close(sock);
-        exit(EXIT_FAILURE);
+    if (connect(csock, (struct sockaddr*)&daemon_addr, sizeof(daemon_addr)) < 0) {
+        perror("Connection to daemon failed");
+        close(csock);
+        return -1;
     }
-    return sock; /* Socket descriptor when returned */    
+    printf("Connected!\n");
+
 
 }
 uint8_t sendNewBlock(const char *ID, const uint8_t *secret, const uint32_t data_length, const char *data){
     blockSock = daemonConnect(); /* Establish socket communication with daemon */
-    if(sock<0){
+    if(blockSock<0){
         log("Socket creation failed");
         exit(EXIT_FAILURE);
     }
