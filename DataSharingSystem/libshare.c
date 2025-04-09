@@ -41,8 +41,15 @@ uint8_t sendNewBlock(const char *ID, const uint8_t *secret, const uint32_t data_
         log("Socket creation failed");
         exit(EXIT_FAILURE);
     }
+    printf("-----Connected to daemon\n-----");
+
+    /* 
+    * Allocates space to maximum buffer
+    * Preprares the string into a char array
+    * Useage due to requiring \0 at the end
+    */
     char buffer[BUFFER];
-    printf("Connected to daemon");
+    snprintf(buffer, sizeof(buffer),"SENDING:%s%s%u%s", ID, secret, data_length, data);
 
 
 
