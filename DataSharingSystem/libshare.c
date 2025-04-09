@@ -19,7 +19,10 @@ uint8_t sendNewBlock(const char *ID, const uint8_t *secret, const uint32_t data_
     int blockfd = connect_to_daemon();
     char msg[MSGSIZE];
     int formatted_msg;
+     
 
+
+    
     printf("SENDING:%s%s%d")
 
 
