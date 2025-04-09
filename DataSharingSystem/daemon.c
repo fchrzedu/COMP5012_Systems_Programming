@@ -90,7 +90,7 @@ int main(void)
         send(client_sock, "---Hello you have connected to the daemon!\n---",43,0 );
         close(server_sock);
         close(client_sock);
-        printf("hi");
+        
     }
     
     
