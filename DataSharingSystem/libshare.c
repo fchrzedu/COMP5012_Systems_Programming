@@ -10,9 +10,21 @@
 
 #define PORT 9002 
 #define LOOPBACK_IP "127.0.0.1"
+#define MSGSIZE 1024
 
 
-uint8_t sendNewBlock(const char *ID, const uint8_t *secret, const uint32_t data_length, const char *data){}
+uint8_t sendNewBlock(const char *ID, const uint8_t *secret, const uint32_t data_length, const char *data)
+{ /* Creates and formats message to daemon, then sends it down socket */
+
+    int blockfd = connect_to_daemon();
+    char msg[MSGSIZE];
+    int formatted_msg;
+
+    printf("SENDING:%s%s%d")
+
+
+    uint8_t 
+}
 uint8_t getBlock(const char *ID, const uint8_t *secret, const uint32_t buffer_size, const char *buffer){}
 
 

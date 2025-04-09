@@ -22,6 +22,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+#define PORT 9002
+#define IP_ADDY "127.0.0.1"
 
 
 void daemon_make(){
@@ -31,7 +33,7 @@ void daemon_make(){
     
     pid = fork();
     if(pid < 0) { 
-        syslog(LOG_ERR, "%s\n", "perror"); 
+        syslog(LOG_ERR, "%s\n", "[-]perror"); 
         exit(EXIT_FAILURE);
     }
     if(pid > 0){exit(EXIT_SUCCESS);} /* Parent exists */      
@@ -40,13 +42,13 @@ void daemon_make(){
     /* ------------In the child (orphaned)...------------- */
 
     if((sid = setsid()) < 0) { /* Create new unique session */
-        syslog(LOG_ERR, "%s\n", "setsid"); /* Log error if failed to setsid */
+        syslog(LOG_ERR, "%s\n", "[-]setsid"); /* Log error if failed to setsid */
         exit(EXIT_FAILURE);
     }
    
     /* Change to root directory  */
     if((chdir("/")) < 0) {
-        syslog(LOG_ERR, "%s\n", "chdir");
+        syslog(LOG_ERR, "%s\n", "[-]chdir");
         exit(EXIT_FAILURE);
     }
 
@@ -68,19 +70,19 @@ void server_socket_TCP(){
 
     struct sockaddr_in server_address; /* Server address structure */
     server_address.sin_family = AF_INET;
-    server_address.sin_port = htons(9002); // port num
+    server_address.sin_port = htons(PORT); // port num
     server_address.sin_addr.s_addr = INADDR_ANY; // accept any connections
 
     /* Binds serversock to address, associated with IPv4 address and its length */
     if(bind(server_sock, (struct sockaddr*) &server_address, sizeof(server_address))){
-        perror("[-] Failed to bind to server socket\n");
+        syslog(LOG_ERr,"%s\n","[-]binderr");
         exit(EXIT_FAILURE);
 
     }
     
     /* Listen for incoming connections, 1 connection at a time */
     if(listen(server_sock, 2) < 0){
-        perror("[-] Failed to listen on socket\n");
+        syslog(LOG_ERR, "%s\n", "[-]listenerr");       
         exit(EXIT_FAILURE);
     }
     
