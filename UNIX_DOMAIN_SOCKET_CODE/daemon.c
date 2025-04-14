@@ -58,7 +58,7 @@ int main(){
 
     memset(&server_address, 0, sizeof(server_address));
     server_address.sun_family = AF_UNIX; /* Stores path on sys as 'server IP' */
-    strncpy(server_address.sun_path, "/tmp/daemon_socket_data", 25);
+    strncpy(server_address.sun_path, "/tmp/unixdomainsocket", 25);
     syslog(LOG_ERR,"[+]Memset worked");
 
     unlink("/tmp/unixdaemonsocket");
@@ -74,6 +74,7 @@ int main(){
 
     listen(server_sock,1);
     while(1){
+        /* Accept() below was throwing sigsegv errors */
         struct sockaddr_un client_address;
         socklen_t client_len = sizeof(client_address);
         client_sock = accept(server_sock, (struct sockaddr*)&client_address, &client_len);

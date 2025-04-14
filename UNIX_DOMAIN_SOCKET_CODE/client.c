@@ -5,7 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define SOCKET_PATH "/tmp/daemon_socket_data"
+#define SOCKET_PATH "/tmp/unixdomainsocket"
 
 int main() {
     int sockfd;
