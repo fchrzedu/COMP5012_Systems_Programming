@@ -14,35 +14,46 @@
 
 #define SOCKET_PATH "/tmp/unixdomainsocket"
 
-int main(){
-    pid_t pid,sid;
+void cleanup(int server_sock){
+    close(server_sock);
+    unlink(SOCKET_PATH);
+    closelog();
+    exit(EXIT_SUCCESS);
+    syslog(LOG_NOTICE, "[+] Daemon shutdown");
+}
 
-    openlog("{daemon_log}",LOG_PID,LOG_DAEMON);
+void daemonize(){
+    pid_t pid, sid;
 
     pid = fork();
-    if(pid<0){
-        syslog(LOG_ERR, "%s\n", "[-]forking error\n"); 
-    }
-    if(pid>0){exit(EXIT_SUCCESS);}
-    syslog(LOG_NOTICE,"[+]Child orph\n");
-
-    if((sid = setsid()) < 0) { /* Create new unique session */
-        syslog(LOG_ERR, "%s\n", "[-]setsid"); /* Log error if failed to setsid */
+    if (pid < 0) {
+        syslog(LOG_ERR, "[-] Forking error");
         exit(EXIT_FAILURE);
     }
-    syslog(LOG_NOTICE,"[+]Made Session\n");
-    /* Change to root directory  */
-    if((chdir("/")) < 0) {
-        syslog(LOG_ERR, "%s\n", "[-]chdir");
+    if (pid > 0) exit(EXIT_SUCCESS); // Parent exits
+
+    if ((sid = setsid()) < 0) {
+        syslog(LOG_ERR, "[-] setsid error");
         exit(EXIT_FAILURE);
     }
 
-    syslog(LOG_NOTICE,"[+]Changed dir\n");
-    umask(0);    
+    if ((chdir("/")) < 0) {
+        syslog(LOG_ERR, "[-] chdir error");
+        exit(EXIT_FAILURE);
+    }
+
+    umask(0);
     close(STDIN_FILENO);
     close(STDOUT_FILENO);
     close(STDERR_FILENO);
-    syslog(LOG_NOTICE,"[+]Closed std - daemon deattached\n");
+
+    syslog(LOG_NOTICE, "[+] Daemon initialized and detached");
+}
+int main(){   
+
+    openlog("{daemon_log}",LOG_PID,LOG_DAEMON);
+    daemonize();
+  
 
     
     int client_sock, server_sock ; /* socket descriptors */
@@ -100,10 +111,7 @@ int main(){
         send(client_sock,welcome_msg,strlen(welcome_msg),0);
         close(client_sock);
     }
-    close(server_sock);
-    unlink(SOCKET_PATH);
-    closelog();
-    exit(EXIT_SUCCESS);
+    cleanup(server_sock);
 
 
 

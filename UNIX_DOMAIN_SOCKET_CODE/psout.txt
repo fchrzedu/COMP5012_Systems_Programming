@@ -41,7 +41,7 @@ PID TT STAT    TIME COMMAND
 241 ?  S    0:00.00 /service/vbfs (null) /mnt -o share=minixshared 
 250 ?  Is   0:00.00 ./da 
 231 co Ss+  0:00.05 -sh 
-258 co D+   0:00.00 ps -ax 
+259 co D+   0:00.00 ps -ax 
 232 c1 Is+  0:00.00 /usr/libexec/getty default ttyc1 
 233 c2 Is+  0:00.00 /usr/libexec/getty default ttyc2 
 234 c3 Is+  0:00.02 /usr/libexec/getty default ttyc3 
