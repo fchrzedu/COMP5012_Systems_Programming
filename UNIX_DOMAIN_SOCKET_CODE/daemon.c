@@ -11,35 +11,38 @@
 /* Socket headers \/*/
 #include <sys/socket.h>
 #include <sys/un.h> /* for UNIX domain, sysnet used for TCP*/
+
+#define SOCKET_PATH "/tmp/unixdomainsocket"
+
 int main(){
     pid_t pid,sid;
 
-    openlog("unixdaemonsocket",LOG_PID,LOG_DAEMON);
+    openlog("{daemon_log}",LOG_PID,LOG_DAEMON);
 
     pid = fork();
     if(pid<0){
         syslog(LOG_ERR, "%s\n", "[-]forking error\n"); 
     }
     if(pid>0){exit(EXIT_SUCCESS);}
-    syslog(LOG_ERR,"[+]Child orph\n");
+    syslog(LOG_NOTICE,"[+]Child orph\n");
 
     if((sid = setsid()) < 0) { /* Create new unique session */
         syslog(LOG_ERR, "%s\n", "[-]setsid"); /* Log error if failed to setsid */
         exit(EXIT_FAILURE);
     }
-    syslog(LOG_ERR,"[+]Made Session\n");
+    syslog(LOG_NOTICE,"[+]Made Session\n");
     /* Change to root directory  */
     if((chdir("/")) < 0) {
         syslog(LOG_ERR, "%s\n", "[-]chdir");
         exit(EXIT_FAILURE);
     }
 
-    syslog(LOG_ERR,"[+]Changed dir\n");
+    syslog(LOG_NOTICE,"[+]Changed dir\n");
     umask(0);    
     close(STDIN_FILENO);
     close(STDOUT_FILENO);
     close(STDERR_FILENO);
-    syslog(LOG_ERR,"[+]Closed std - daemon deattached\n");
+    syslog(LOG_NOTICE,"[+]Closed std - daemon deattached\n");
 
     
     int client_sock, server_sock ; /* socket descriptors */
@@ -49,17 +52,17 @@ int main(){
         syslog(LOG_ERR,"[-]Server socket creation failed!\n");
         exit(EXIT_FAILURE);
     }
-    syslog(LOG_ERR,"[+]socket() done");
+    syslog(LOG_NOTICE,"[+]socket() done");
 
     char buff[108]; /* exact size of sun_path */
     memset(buff, 0, sizeof(buff));
-    strncpy(buff, "/tmp/unixdomainsocket", sizeof(buff) - 1);
-    syslog(LOG_ERR, "testbuf = %s", buff);
+    strncpy(buff, SOCKET_PATH, sizeof(buff) - 1);
+    syslog(LOG_NOTICE, "testbuf = %s", buff);
 
     memset(&server_address, 0, sizeof(server_address));
     server_address.sun_family = AF_UNIX; /* Stores path on sys as 'server IP' */
-    strncpy(server_address.sun_path, "/tmp/unixdomainsocket", 25);
-    syslog(LOG_ERR,"[+]Memset worked");
+    strncpy(server_address.sun_path, SOCKET_PATH, 25);
+    syslog(LOG_NOTICE,"[+]Memset worked");
 
     unlink("/tmp/unixdaemonsocket");
 
@@ -69,7 +72,7 @@ int main(){
         close(server_sock); /* Close server socket and exit with fail, loggin err */
         exit(EXIT_FAILURE);
     }
-    syslog(LOG_ERR,"[+]Bind() success\n");
+    syslog(LOG_NOTICE,"[+]Bind() success\n");
 
 
     listen(server_sock,1);
@@ -77,6 +80,11 @@ int main(){
         /* Accept() below was throwing sigsegv errors */
         struct sockaddr_un client_address;
         socklen_t client_len = sizeof(client_address);
+        /*
+        -> 1st = server socket that is listening to connections
+        -> 2nd = ptr to socket of address struct sockaddr* (so client)
+            casted to know the socket type (which original accept() was missing)
+        */
         client_sock = accept(server_sock, (struct sockaddr*)&client_address, &client_len);
 
         if(client_sock <0){
@@ -84,14 +92,16 @@ int main(){
             close(client_sock); 
             exit(EXIT_FAILURE);
         }
-        syslog(LOG_ERR,"[+]Accept() success\n");
-
+        syslog(LOG_NOTICE,"[+]Accept() success\n");
+        const char *connecting_msg = ">>Connecting....\n";
         const char *welcome_msg = "---You have succesfully connected to the daemon!\n";
+        send(client_sock,connecting_msg,strlen(connecting_msg),0);
+        
         send(client_sock,welcome_msg,strlen(welcome_msg),0);
         close(client_sock);
     }
     close(server_sock);
-    unlink("/tmp/unixdomainsocket");
+    unlink(SOCKET_PATH);
     closelog();
     exit(EXIT_SUCCESS);
 
