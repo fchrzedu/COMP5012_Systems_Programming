@@ -15,8 +15,10 @@
 
 void socketFail(){
     syslog(LOG_ERR,"[-]Client socket creation failed!\n");
-        exit(EXIT_FAILURE);
-    }
+    exit(EXIT_FAILURE);
+}
+
+
 void callLog(){
     openlog("API shared library", LOG_PID, LOG_DAEMON);
 }
@@ -70,5 +72,5 @@ int connect_to_daemon(){
 
     close(c_sock_fd);
 
-    return 0;
+    return c_sock_fd;
 }
