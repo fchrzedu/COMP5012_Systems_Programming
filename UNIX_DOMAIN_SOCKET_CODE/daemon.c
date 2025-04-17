@@ -124,7 +124,8 @@ void daemonize() {
 }
 
 int main() {
-    openlog("{daemon_log}", LOG_PID, LOG_DAEMON);
+    printf("About to daemonsize\n");
+    openlog(">>DAEMONSOCKETSERV", LOG_PID, LOG_DAEMON);
     daemonize();
 
     int server_sock = initSocket();
