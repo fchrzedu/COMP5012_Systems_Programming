@@ -8,10 +8,20 @@
 
 
 uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data){
-
+/* send(int sd, const void *msg, size_t msg_len, int flags)
+> sd = sockfd
+> msg = string poiter
+> msg_len = len(msg)
+> flags = 0*/
     int sockfd = connectDaemon();
     if(sockfd < 0){return -1;}
-
+    /* Sending ID */
+    
+    if (send(sockfd, ID, len(ID) + 1, 0) <0){
+        perror("[-]SendID err");
+        close(sockfd);
+        return -1;
+    }
     
 }
 int connectDaemon(){

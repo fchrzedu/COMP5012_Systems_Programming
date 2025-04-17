@@ -11,6 +11,16 @@
 #include <sys/un.h>
 
 #define SOCKET_PATH "/tmp/unixdomainsocket"
+#define MAX_STORAGE 100  // Max number of blocks to store
+
+typedef struct {
+    char ID[100];         // ID string
+    uint8_t secret[16];   // 16-byte secret
+    uint32_t data_length; // Length of the data
+    void *data;           // Pointer to the actual data
+} DataBlock;
+
+DataBlock storage[MAX_STORAGE];
 
 int initSocket() {
     int server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -48,6 +58,12 @@ void bindListen(int server_sock, struct sockaddr_un *server_address) {
     listen(server_sock, 1); // Start listening
 }
 
+void handleData(int client_sock){
+    
+    
+    
+
+}
 void connectionHandling(int server_sock) {
     int client_sock;
     struct sockaddr_un client_address;
@@ -64,11 +80,7 @@ void connectionHandling(int server_sock) {
         }
 
         syslog(LOG_NOTICE, "[+] Accept() success\n");
-        const char *connecting_msg = ">>Connecting....\n";
-        const char *welcome_msg = "---You have successfully connected to the daemon!\n";
-        send(client_sock, connecting_msg, strlen(connecting_msg), 0);
-        send(client_sock, welcome_msg, strlen(welcome_msg), 0);
-        close(client_sock);
+        handleData(client_sock);
     }
 }
 
