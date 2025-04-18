@@ -87,7 +87,7 @@ void connectionHandling(int server_sock) {
         }
 
         syslog(LOG_NOTICE, "[+] Accept() success\n");
-        handleData(client_sock);
+       // handleData(client_sock);
     }
 }
 
