@@ -15,15 +15,16 @@
 #define RES_NOT_FOUND 3
 #define RES_ALREADY_EXISTS 4
 
-/* Establishes a daemon connection*/
-int connectDaemon();
 
-int handleErr(int sockfd);
-/* opens logging for sharedlib*/
-void logOpen();
+int connectDaemon();/* Establishes a daemon connection*/
 
+uint8_t handleErr(int sockfd); /* handles RES_FAILURE */
+
+void logOpen();/* opens logging for sharedlib*/
 uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data);
-
 uint8_t getBlock(char *ID, uint8_t *secret, uint32_t buffer_size, void *buffer);
 
+/* two helper functions*/
+ssize_t sendAllData(int fd, const void *d, size_t d_len);
+ssize_t receiveAllData(int fd, void *buff, size_t length);
 #endif // SHAREDLIB_H
