@@ -1,5 +1,8 @@
 #include <stdio.h>
-#include "sharedlib.h"
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include "sharedlib.h" /* shared lib implementation */
 
 int main() {
     int sockfd = connectDaemon();

@@ -5,11 +5,11 @@
 
 #define SOCKET_PATH "/tmp/unixdomainsocket"
 
-/* Error return failure codes*/
-#define SEND_BLOCK 1
+/* Op code depending on what the daemon MUST provide */
+#define SEND_BLOCK 1 
 #define GET_BLOCK 2
-
-#define RES_SUCCESS      0
+/* Error return failure codes*/
+#define RES_SUCCESS      0 /* res = response from daemon */
 #define RES_FAILURE      1
 #define RES_ACCESS_DENIED 2
 #define RES_NOT_FOUND    3
@@ -18,7 +18,9 @@
 /* Establishes a daemon connection*/
 int connectDaemon();
 
-void openLog();
+int handleErr(int sockfd);
+/* opens logging for sharedlib*/
+void logOpen();
 
 uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data);
 
