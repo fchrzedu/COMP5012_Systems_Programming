@@ -95,51 +95,5 @@ uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data
 
 
 uint8_t getBlock(char *ID, uint8_t *secret, uint32_t buffer_size, void *buffer) 
-{
-    /* still need to send daemon data to recieve what we want
-    -----need to implement library modularity here to work w/ senNewBlock-----
-    */
-    logOpen();    
-    int gsockfd = connectDaemon();/* gsockfd = GET sockfd */
-    uint8_t bcmd = GET_BLOCK; /*bcmd = block cmd*/
-    uint32_t ID_len = strlen(ID) + 1; /* easier here, than checking each time*/
 
-    if(send(gsockfd, &bcmd, sizeof(bcmd),0)!=sizeof(bcmd)){
-        syslog(LOG_ERR, "[-]CMD_GET_BLOCK send err\n");
-        return handleErr(gsockfd);
-    }
-    if(send(gsockfd, ID, ID_len, 0)!=ID_len){
-        syslog(LOG_ERR, "[-]ID send error\n");
-        return handleErr(gsockfd);
-    }
-    if (send(gsockfd, secret, 16, 0) != 16) {
-        syslog(LOG_ERR, "[-]Send secret error\n");        
-        return handleErr(gsockfd);
-
-    }
-    if (send(gsockfd, &buffer_size, sizeof(buffer_size), 0) != sizeof(buffer_size)) {
-        syslog(LOG_ERR, "[-]Send buffer size error\n");
-        return handleErr(gsockfd);
-    }
-    /* recieve res*/
-    uint8_t res;
-    int res_size = sizeof(res);
-    if(recv(gsockfd, &res, res_size, 0) != res_size){
-        syslog(LOG_ERR, "[-]Daemon response recv() error\n");
-        return handleErr(gsockfd);
-    }
-    /* success*/
-    if(res == RES_SUCCESS){
-        if(recv(gsockfd, buffer, buffer_size, 0) != buffer_size){
-            syslog(LOG_ERR, "[-]Daemon data send error (buffer)\n");
-            return handleErr(gsockfd);
-        }
-    }
-    close(gsockfd);
-    syslog(LOG_INFO, "[+]getBlock response = %d", res);
-    return res;
-    
-    
-
-}
 
