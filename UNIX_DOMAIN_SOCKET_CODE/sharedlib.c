@@ -50,7 +50,7 @@ uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data
     uint32_t IDlen = strlen(ID);
 
     /* sending op code to daemon */
-    if(send(send_block_fd, s_cmd, sizeof(s_cmd), 0) != sizeof(s_cmd)){
+    if(send(send_block_fd, &s_cmd, sizeof(s_cmd), 0) != sizeof(s_cmd)){
         syslog(LOG_ERR, "[-]CMD_SEND_BLOCK not sent\n");
         return handleErr(send_block_fd);
     }
@@ -153,18 +153,18 @@ uint8_t getBlock(char *ID, uint8_t *secret, uint32_t buffer_size, void *buffer){
     /* recv() data when success */
     ssize_t recv_counter = 0; 
     while((uint32_t)recv_counter < buffer_size){
-        ssize_t recv = recv(get_blockfd, (char*)buffer + recv_counter, buffer_size - recv_counter, 0);
+        ssize_t received = recv(get_blockfd, (char*)buffer + recv_counter, buffer_size - recv_counter, 0);
 
         /* error check for either incomplete receiving or halt mid process */
-        if(recv < 0){
+        if(received < 0){
             syslog(LOG_ERR, "[-getBlock()] Error receiving data from daemon.c\n");
             return handleErr(get_blockfd);
         }
-        if(recv == 0){
+        if(received == 0){
             syslog(LOG_ERR, "[-getBlock()] Connection terminated!\n");
             return handleErr(get_blockfd);
         }
-        recv_counter += recv;
+        recv_counter += received;
     }
 
     close(get_blockfd);
