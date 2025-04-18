@@ -82,7 +82,7 @@ uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data
         ssize_t sent = send(send_block_fd, dataptr + sent_counter, data_length - sent_counter, 0);
         if(sent < 1){
             syslog(LOG_ERR, "[-sendnewBlock()]Error sending data [dataptr] to daemon.c\n");
-            return handleErr(send_block_fd;)
+            return handleErr(send_block_fd);
         }
         sent_counter += sent;
     }

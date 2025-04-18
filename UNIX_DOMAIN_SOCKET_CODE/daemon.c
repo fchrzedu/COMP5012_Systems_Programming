@@ -22,6 +22,16 @@
 #define SOCKET_PATH "/tmp/unixdomainsocket"
 #define MAX_STORAGE 100  // Max number of blocks to store
 
+typedef struct {
+    char ID[256];
+    uint8_t secret[16];
+    uint8_t *data;
+    uint32_t data_length;
+    int is_used;
+} DataBlock;
+
+static DataBlock storage[MAX_STORAGE];
+
 
 int initSocket() {
     int server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -58,6 +68,7 @@ void bindListen(int server_sock, struct sockaddr_un *server_address) {
 
     listen(server_sock, 1); // Start listening
 }
+
 
 
 void connectionHandling(int server_sock) {

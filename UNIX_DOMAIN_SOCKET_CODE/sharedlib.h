@@ -6,8 +6,8 @@
 #define SOCKET_PATH "/tmp/unixdomainsocket"
 
 /* Op code depending on what the daemon MUST provide */
-#define SEND_BLOCK 1 
-#define GET_BLOCK 2
+#define CMD_SEND_BLOCK 1 
+#define CMD_GET_BLOCK 2
 /* Error return failure codes*/
 #define RES_SUCCESS 0 /* res = response from daemon */
 #define RES_FAILURE 1
