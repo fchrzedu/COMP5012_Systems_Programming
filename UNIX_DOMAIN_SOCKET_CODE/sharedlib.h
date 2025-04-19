@@ -21,6 +21,7 @@ int connectDaemon();/* Establishes a daemon connection*/
 uint8_t handleErr(int sockfd); /* handles RES_FAILURE */
 
 void logOpen();/* opens logging for sharedlib*/
+
 uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data);
 uint8_t getBlock(char *ID, uint8_t *secret, uint32_t buffer_size, void *buffer);
 
