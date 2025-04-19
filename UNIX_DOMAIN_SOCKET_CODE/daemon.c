@@ -22,6 +22,7 @@
 #define SOCKET_PATH "/tmp/unixdomainsocket"
 #define MAX_STORAGE 100  // Max number of blocks to store
 
+/* represents each block of data w/ maximum of 100 blocks stored*/
 typedef struct {
     char ID[256];
     uint8_t secret[16];
@@ -32,6 +33,120 @@ typedef struct {
 
 static DataBlock storage[MAX_STORAGE];
 
+uint8_t handleSendBlock(int cfd){
+    char ID[256];
+    uint8_t secret[16];
+    uint32_t data_length;
+    uint8_t *data = NULL;
+    ssize_t received = 0;
+
+    received = receiveAllData(cfd, ID, sizeof(ID));
+    if(received <1){return RES_FAILURE;}
+
+    received = receiveAllData(cfd, secret, 16);
+    if(received !=16){return RES_FAILURE;}
+
+    received = receiveAllData(cfd, &data_length, data_length);
+    if(received != sizeof(data_length)){return RES_FAILURE;}
+
+    data = malloc(data_length);
+    if(data==NULL){return RES_FAILURE;}
+
+    received = receiveAllData(cfd, data, data_length);
+    if(received != data_length){
+        free(data);
+        return RES_FAILURE;
+    }
+    
+    for(int i = 0; i < MAX_STORAGE; i++){
+        if(storage[i].is_used && strcmp(storage[i].ID,ID) == 0){
+            if(memcpy(storage[i].secret,secret,16) != 0){
+                free(data);
+                return RES_ACCESS_DENIED;
+            }
+            free(storage[i].data);
+            storage[i].data = data;
+            storage[i].data_length = data_length;
+            return RES_SUCCESS;
+        }
+    }
+    for (int i = 0; i < MAX_STORAGE; i++) {
+        if (!storage[i].is_used) {
+            strncpy(storage[i].ID, ID, sizeof(storage[i].ID) - 1);
+            memcpy(storage[i].secret, secret, 16);
+            storage[i].data = data;
+            storage[i].data_length = data_length;
+            storage[i].is_used = 1;
+            return RES_SUCCESS;
+        }
+    }
+    free(data);
+    return RES_FAILURE; /* full on mem buff */
+
+}
+
+uint8_t handleGetBlock(int cfd) {
+    char ID[256];
+    uint8_t secret[16];
+    uint32_t buffer_size;
+    ssize_t received = 0;
+
+    received = receiveAllData(cfd, ID, sizeof(ID));
+    if (received <= 0) return RES_FAILURE;
+
+    received = receiveAllData(cfd, secret, 16);
+    if (received != 16) return RES_FAILURE;
+
+    received = receiveAllData(cfd, &buffer_size, sizeof(buffer_size));
+    if (received != sizeof(buffer_size)) return RES_FAILURE;
+
+    int i;
+    for (i = 0; i < MAX_STORAGE; i++) {
+        if (storage[i].is_used && strcmp(storage[i].ID, ID) == 0) {
+            if (memcmp(storage[i].secret, secret, 16) != 0) {
+                return RES_ACCESS_DENIED;
+            }
+
+            if (storage[i].data_length > buffer_size) {
+                return RES_FAILURE;
+            }
+
+            if (sendAllData(cfd, storage[i].data, storage[i].data_length) != 0) {
+                return RES_FAILURE;
+            }
+
+            return RES_SUCCESS;
+        }
+    }
+
+    return RES_NOT_FOUND;
+}
+ssize_t receiveAllData(int sfd, void *buff, size_t length){
+    size_t total = 0;
+    char *buffer = (char*)buff; /* derefencing buffer ptr -- access stored values*/
+
+    while(total < length){
+        ssize_t received = recv(sfd, buffer+total, length - total, 0);
+        if(received < 0){
+            return -1;// Implement syslog() & exit() here or res_Failure
+        }
+        total += received;
+    }
+    return total;
+}
+
+ssize_t sendAllData(int sfd, const void *data, size_t length){
+    size_t sent_total = 0;
+    const char *dataptr = (const char*)data;
+    while(sent_total < length){
+        ssize_t sent = send(sfd, dataptr+sent_total, length - sent_total, 0);
+        if(send < 1){
+            return -1; // Implement syslog() & exit() here or res_Failure
+        }
+        sent_total += sent;
+    }
+    return 0;
+}
 
 int initSocket() {
     int server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -75,6 +190,7 @@ void connectionHandling(int server_sock) {
     int client_sock;
     struct sockaddr_un client_address;
     socklen_t client_len;
+    uint8_t code; uint8_t resp;
 
     while (1) {
         client_len = sizeof(client_address);
@@ -87,7 +203,18 @@ void connectionHandling(int server_sock) {
         }
 
         syslog(LOG_NOTICE, "[+] Accept() success\n");
-       // handleData(client_sock);
+        
+        if(receiveAllData(client_sock,&code,sizeof(code)) != sizeof(code)){
+            resp = RES_FAILURE;
+        }
+        else if(code == CMD_SEND_BLOCK){
+            resp = handleSendBlock(client_sock);
+        }else if(code == CMD_GET_BLOCK){
+            resp = handleGetBlock(client_sock);
+        }
+        else{resp = RES_FAILURE;}
+        sendAllData(client_sock,&resp,sizeof(resp));
+        close(client_sock);
     }
 }
 
