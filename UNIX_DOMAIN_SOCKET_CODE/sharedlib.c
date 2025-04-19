@@ -28,7 +28,7 @@ int connectDaemon(){
 }
 uint8_t handleErr(int fd){
     close(fd);
-    return RES_FAILURE;
+    return FAIL_RES;
 
 }
 void logOpen(){
@@ -76,7 +76,7 @@ uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data
     }
 
     /* Send OP code to DAEMON */
-    uint8_t opcode = CMD_SEND_BLOCK;
+    uint8_t opcode = SEND_BLOCK;
     if (sendAllData(send_fd, &opcode, sizeof(opcode)) != sizeof(opcode)){
         syslog(LOG_ERR, "[-sendNewBlock()] failed to send CMD_SEND_BLOCK\n");
         return handleErr(send_fd);

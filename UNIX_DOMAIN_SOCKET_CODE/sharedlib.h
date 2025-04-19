@@ -5,7 +5,7 @@
 
 #define SOCKET_PATH "/tmp/unixdomainsocket"
 
-/
+
 /* OP & response codes to communicate with daemon to client */
 #define SEND_BLOCK 0
 #define GET_BLOCK 1

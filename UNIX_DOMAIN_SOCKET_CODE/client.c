@@ -1,26 +1,37 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include "sharedlib.h" /* shared lib implementation */
+#include <stdlib.h>
+#include "sharedlib.h"  // make sure this matches your API
 
 int main() {
-    char *test_id = "block1";
-    uint8_t secret[16] = {0}; // All-zero test secret
-    char *msg = "Hello from client!";
-    uint32_t msg_len = strlen(msg) + 1;
+    const char *block_id = "testblock001";
+    uint8_t secret[16] = {
+        0x10, 0x20, 0x30, 0x40,
+        0x50, 0x60, 0x70, 0x80,
+        0x90, 0xA0, 0xB0, 0xC0,
+        0xD0, 0xE0, 0xF0, 0x01
+    };
+    const char *payload = "tEsT bLoCk dAta00002";
+    uint32_t payload_len = strlen(payload);
 
-    uint8_t res = sendNewBlock(test_id, secret, msg_len, msg);
-    printf("Send response = %d\n", res);
-
-    char buffer[128];
-    res = getBlock(test_id, secret, sizeof(buffer), buffer);
-    if (res == RES_SUCCESS) {
-        printf("Received block: %s\n", buffer);
+    printf("Sending block ID: %s\n", block_id);
+    printf("Secret: ");
+    for (int i = 0; i < sizeof(secret); i++) {
+        printf("%02X ", secret[i]);
+    }
+    printf("\n");
+    printf("Payload Length: %u\n", payload_len);
+    printf("Payload: %s\n", payload);
+    
+    uint8_t status = sendNewBlock(block_id,secret,payload_len,(void*)payload);
+    if (status == 0) {
+        printf("[+] Block successfully sent to daemon.\n");
+    } else if (status == 4) {
+        printf("[!] Block already exists.\n");
     } else {
-        printf("Failed to get block. Error code: %d\n", res);
+        printf("[-] Failed to send block. Error code: %d\n", status);
     }
 
     return 0;
 }
-

@@ -211,7 +211,7 @@ void connectionHandling(int server_sock) {
                 resp = handleSendBlock(client_sock);
                 break;
             case GET_BLOCK:
-                resp = handleGetBlock(client_sock);
+                //resp = handleGetBlock(client_sock);
                 break;
             default:
             /* directly casts FAIL_RES, rather than uint8_t response = FAIL_RES; */
