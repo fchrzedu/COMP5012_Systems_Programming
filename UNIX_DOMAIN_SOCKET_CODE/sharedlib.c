@@ -80,15 +80,12 @@ uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data
         return RES_FAILURE;
     }
 
-    uint32_t IDlen = strlen(ID) + 1;
-
-    if (sendAllData(send_block_fd, &s_cmd, sizeof(s_cmd)) < 0) {
+    char fixed_id[256] = {0};
+    strncpy(fixed_id, ID, sizeof(fixed_id) - 1);
+    if (sendAllData(send_block_fd, fixed_id, sizeof(fixed_id)) != 0) {
         return handleErr(send_block_fd);
     }
 
-    if (sendAllData(send_block_fd, ID, IDlen) != IDlen) {
-        return handleErr(send_block_fd);
-    }
 
     if (sendAllData(send_block_fd, secret, 16) != 16) {
         return handleErr(send_block_fd);
@@ -128,22 +125,37 @@ uint8_t getBlock(char *ID, uint8_t *secret, uint32_t buffer_size, void *buffer){
         return RES_FAILURE;
     }
     
-    int g_cmd = CMD_GET_BLOCK;
+    uint8_t g_cmd = CMD_GET_BLOCK;
     if (sendAllData(get_blockfd, &g_cmd, sizeof(g_cmd)) < 0) {
+        syslog(LOG_ERR, "getBlock(): Failed to send command");
         return handleErr(get_blockfd);
     }
 
-    uint32_t IDlen = strlen(ID) + 1;
-    if (sendAllData(get_blockfd, ID, IDlen) != IDlen) {
+    char fixed_id[256] = {0};
+    strncpy(fixed_id, ID, sizeof(fixed_id) - 1);
+    if (sendAllData(get_blockfd, fixed_id, sizeof(fixed_id)) != 0) {
+        syslog(LOG_ERR, "getBlock(): Failed to send ID");
+        return handleErr(get_blockfd);
+    }
+    syslog(LOG_INFO, "getBlock(): Sending secret, fd = %d", get_blockfd);
+
+    if (secret == NULL) {
+    syslog(LOG_ERR, "getBlock(): Secret pointer is NULL");
         return handleErr(get_blockfd);
     }
 
     if (sendAllData(get_blockfd, secret, 16) != 16) {
+        syslog(LOG_ERR, "getBlock(): Failed to send secret");
         return handleErr(get_blockfd);
     }
 
+    syslog(LOG_INFO, "getBlock(): Sending buffer_size = %u", buffer_size);
     if (sendAllData(get_blockfd, &buffer_size, sizeof(buffer_size)) != sizeof(buffer_size)) {
+        syslog(LOG_ERR, "getBlock(): Failed to send buffer_size");
         return handleErr(get_blockfd);
+    }
+    else {
+        syslog(LOG_INFO, "getBlock(): buffer_size sent successfully");
     }
 
     uint8_t resp;

@@ -33,6 +33,32 @@ typedef struct {
 
 static DataBlock storage[MAX_STORAGE];
 
+ssize_t receiveAllData(int sfd, void *buff, size_t length){
+    size_t total = 0;
+    char *buffer = (char*)buff; /* derefencing buffer ptr -- access stored values*/
+
+    while(total < length){
+        ssize_t received = recv(sfd, buffer+total, length - total, 0);
+        if(received < 0){
+            return -1;// Implement syslog() & exit() here or res_Failure
+        }
+        total += received;
+    }
+    return total;
+}
+
+ssize_t sendAllData(int sfd, const void *data, size_t length){
+    size_t sent_total = 0;
+    const char *dataptr = (const char*)data;
+    while(sent_total < length){
+        ssize_t sent = send(sfd, dataptr+sent_total, length - sent_total, 0);
+        if(send < 1){
+            return -1; // Implement syslog() & exit() here or res_Failure
+        }
+        sent_total += sent;
+    }
+    return 0;
+}
 uint8_t handleSendBlock(int cfd){
     char ID[256];
     uint8_t secret[16];
@@ -46,7 +72,7 @@ uint8_t handleSendBlock(int cfd){
     received = receiveAllData(cfd, secret, 16);
     if(received !=16){return RES_FAILURE;}
 
-    received = receiveAllData(cfd, &data_length, data_length);
+    received = receiveAllData(cfd, &data_length, sizeof(data_length));
     if(received != sizeof(data_length)){return RES_FAILURE;}
 
     data = malloc(data_length);
@@ -91,62 +117,61 @@ uint8_t handleGetBlock(int cfd) {
     uint32_t buffer_size;
     ssize_t received = 0;
 
+    syslog(LOG_INFO, "handleGetBlock(): Entering handler...");
+
     received = receiveAllData(cfd, ID, sizeof(ID));
-    if (received <= 0) return RES_FAILURE;
+    if (received <= 0) {
+        syslog(LOG_ERR, "handleGetBlock(): Failed to receive ID");
+        return RES_FAILURE;
+    }
+    syslog(LOG_INFO, "handleGetBlock(): Received ID = %s", ID);
 
     received = receiveAllData(cfd, secret, 16);
-    if (received != 16) return RES_FAILURE;
+    if (received != 16) {
+        syslog(LOG_ERR, "handleGetBlock(): Failed to receive secret");
+        return RES_FAILURE;
+    }
+    syslog(LOG_INFO, "handleGetBlock(): Received secret OK");
 
     received = receiveAllData(cfd, &buffer_size, sizeof(buffer_size));
-    if (received != sizeof(buffer_size)) return RES_FAILURE;
+    if (received != sizeof(buffer_size)) {
+        syslog(LOG_ERR, "handleGetBlock(): Failed to receive buffer_size. Got %ld, expected %lu", received, sizeof(buffer_size));
+
+        return RES_FAILURE;
+    }
+    syslog(LOG_INFO, "handleGetBlock(): buffer_size = %u", buffer_size);
+
 
     int i;
     for (i = 0; i < MAX_STORAGE; i++) {
         if (storage[i].is_used && strcmp(storage[i].ID, ID) == 0) {
+            syslog(LOG_INFO, "handleGetBlock(): Matching ID found at index %d", i);
+            
             if (memcmp(storage[i].secret, secret, 16) != 0) {
+                syslog(LOG_ERR, "handleGetBlock(): Secret mismatch");
                 return RES_ACCESS_DENIED;
             }
 
             if (storage[i].data_length > buffer_size) {
+                syslog(LOG_ERR, "handleGetBlock(): Buffer too small (%u needed, %u given)", storage[i].data_length, buffer_size);
                 return RES_FAILURE;
             }
 
             if (sendAllData(cfd, storage[i].data, storage[i].data_length) != 0) {
+                syslog(LOG_ERR, "handleGetBlock(): Failed to send data");
                 return RES_FAILURE;
             }
 
+            syslog(LOG_INFO, "handleGetBlock(): Data sent successfully");
             return RES_SUCCESS;
         }
     }
 
+    syslog(LOG_ERR, "handleGetBlock(): ID not found");
     return RES_NOT_FOUND;
 }
-ssize_t receiveAllData(int sfd, void *buff, size_t length){
-    size_t total = 0;
-    char *buffer = (char*)buff; /* derefencing buffer ptr -- access stored values*/
 
-    while(total < length){
-        ssize_t received = recv(sfd, buffer+total, length - total, 0);
-        if(received < 0){
-            return -1;// Implement syslog() & exit() here or res_Failure
-        }
-        total += received;
-    }
-    return total;
-}
 
-ssize_t sendAllData(int sfd, const void *data, size_t length){
-    size_t sent_total = 0;
-    const char *dataptr = (const char*)data;
-    while(sent_total < length){
-        ssize_t sent = send(sfd, dataptr+sent_total, length - sent_total, 0);
-        if(send < 1){
-            return -1; // Implement syslog() & exit() here or res_Failure
-        }
-        sent_total += sent;
-    }
-    return 0;
-}
 
 int initSocket() {
     int server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
