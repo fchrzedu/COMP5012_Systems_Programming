@@ -159,7 +159,7 @@ uint8_t handleSendBlock(int clientfd){
     }
     /* ---------- FIND FREE STORAGE[] BLOCK ----------*/
     int indx = findFreeBlockIndx();
-    if(index == -1){
+    if(indx == -1){
         syslog(LOG_ERR,"[-] failed to store block. full storage\n");
         free(data);
         resp = FAIL_RES;
@@ -167,12 +167,26 @@ uint8_t handleSendBlock(int clientfd){
         return resp;
     }
     /* ---------- STORE BLOCK IN STORAGE[] ----------*/
+
+    syslog(LOG_ERR,"[handleSendBlock()] storing block with id: %.20s", id);
+    syslog(LOG_ERR,"storing block with secret: ");
+    for(int i = 0; i < 16; i++){
+        syslog(LOG_ERR,"%02X ",secret[i]);
+    }
+    syslog(LOG_NOTICE, "[handleSendBlock()] Storing data: ");
+    for (size_t i = 0; i < data_length && i < 50; i++) {
+        syslog(LOG_NOTICE, "%c", ((uint8_t *)data)[i]);  // Print data byte by byte as characters
+    }
+    if (data_length > 50) {
+        syslog(LOG_NOTICE, "...");  // Indicate more data exists
+    }
     strncpy(storage[indx].ID,id,sizeof(storage[indx].ID) -1 );
     memcpy(storage[indx].secret,secret,sizeof(secret));
     storage[indx].data = data;
     storage[indx].data_length = data_length;
     storage[indx].is_used = 1;
     syslog(LOG_ERR,"[+] succesfully stored new block\n");
+
     resp = SUCCESS_RES;
     send(clientfd,&resp,sizeof(resp),0);
     free(data);

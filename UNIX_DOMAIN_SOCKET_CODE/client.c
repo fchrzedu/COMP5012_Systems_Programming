@@ -12,7 +12,7 @@ int main() {
         0x90, 0xA0, 0xB0, 0xC0,
         0xD0, 0xE0, 0xF0, 0x01
     };
-    const char *payload = "tEsT bLoCk dAta00002";
+    const char *payload = "Hello, this is test block data!";
     uint32_t payload_len = strlen(payload);
 
     printf("Sending block ID: %s\n", block_id);
