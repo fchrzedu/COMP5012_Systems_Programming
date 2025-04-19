@@ -7,22 +7,6 @@
 #include <sys/un.h>
 #include <syslog.h>
 #include "sharedlib.h"
-
-uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data){
-    /*
-    - Establish IPC connection to daemon.c
-    - Send approriate command to daemon.c, including 'ID' and 'secret'
-    - send data_length bytes starting at address 'data' to daemon.c
-    - retrieve a response from the daemon.c - indicate whether storing data was succesful
-    - return a value to calling program ( a client ) reflecting daemons resposne
-    */
-}
-
-uint8_t handleErr(int fd){
-    close(fd);
-    return RES_FAILURE;
-
-}
 int connectDaemon(){
     logOpen();
     struct sockaddr_un address;
@@ -42,7 +26,94 @@ int connectDaemon(){
     }
     return sockfd;
 }
+uint8_t handleErr(int fd){
+    close(fd);
+    return RES_FAILURE;
+
+}
 void logOpen(){
     openlog(">sharedlib", LOG_PID | LOG_CONS, LOG_USER);
 }
+/* Sends all block data to daemon*/
+ssize_t sendAllData(int fd, const void *data, size_t d_len){
+    size_t total_data_sent = 0;
+    const uint8_t *dptr = data;
+    while(total_data_sent < d_len){
+        ssize_t sent = send(fd, dptr+total_data_sent, d_len - total_data_sent, 0);
+        if(sent < 1){return -1;}
+        total_data_sent += sent;
+    }
+    return total_data_sent;
+}
+/* Receives all data from daemon */
+ssize_t receiveAllData(int fd, void *buff, size_t length){
+    size_t total_received = 0;
+    uint8_t *buffptr = buff;
+    while(total_received < length){
+        ssize_t recvd = recv(fd, buffptr + total_received, length - total_received, 0);
+        if(recvd < 1){return -1;}
+        total_received += recvd;
+    }
+    return total_received;
+}
 
+
+
+
+
+uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data){
+    logOpen();
+    /*
+    - Establish IPC connection to daemon.c
+    - Send approriate command to daemon.c, including 'ID' and 'secret' (OP code such as SEND_BLOCK)
+    - send data_length bytes starting at address 'data' to daemon.c
+    - retrieve a response from the daemon.c - indicate whether storing data was succesful
+    - return a value to calling program ( a client ) reflecting daemons resposne
+    */
+    int send_fd = connectDaemon(); /* socket to connect to daemon */
+    if(send_fd < 0){
+        return handleErr(send_fd);
+    }
+
+    /* Send OP code to DAEMON */
+    uint8_t opcode = CMD_SEND_BLOCK;
+    if (sendAllData(send_fd, &opcode, sizeof(opcode)) != sizeof(opcode)){
+        syslog(LOG_ERR, "[-sendNewBlock()] failed to send CMD_SEND_BLOCK\n");
+        return handleErr(send_fd);
+    }
+
+    /* Sending ID to daemon.c -  */
+    char id_buffer[256] = {0};
+    strncpy(id_buffer, ID, sizeof(id_buffer) - 1);
+    if(sendAllData(send_fd, id_buffer, sizeof(id_buffer)) != sizeof(id_buffer)){
+        syslog(LOG_ERR,"[-sendNewBlock()] failed to send ID to daemon\n");
+        return handleErr(send_fd);
+    }
+
+    /* send 16 byte secret to daemon */
+    if(sendAllData(send_fd, secret, 16) != 16){
+        syslog(LOG_ERR, "[-sendNewBlock()] failed to send secret to daemon\n");
+        return handleErr(send_fd);
+    }
+    /* sending data length bytes to daemon - prepare buffer */
+    if(sendAllData(send_fd, &data_length, sizeof(data_length)) != sizeof(data_length)){
+        syslog(LOG_ERR, "[-sendNewBlock()] failed to send data_length to daemon\n");
+        return handleErr(send_fd);
+    }
+    /* send actual data over*/
+    if(sendAllData(send_fd, data, data_length) != data_length){
+        syslog(LOG_ERR, "[-sendNewBlock()] failed to send data to daemon\n");
+        return handleErr(send_fd);
+    }
+
+    /* If succesfully sent, await for op code from daemon */
+    uint8_t resp;
+    if(receiveAllData(send_fd, &resp, sizeof(resp)) != sizeof(resp)){
+        syslog(LOG_ERR, "[-sendNewBlock()] failed to receive daemon OPCODE resp\n");
+        return handleErr(send_fd);
+    }
+    close(send_fd);
+    return resp;
+
+    
+}
