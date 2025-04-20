@@ -5,14 +5,14 @@
 #include "sharedlib.h"  // make sure this matches your API
 
 int main() {
-    const char *block_id = "testblock001";
+    const char *block_id = "testblocak003";
     uint8_t secret[16] = {
-        0x10, 0x20, 0x30, 0x40,
+        0x11, 0x20, 0x30, 0x40,
         0x50, 0x60, 0x70, 0x80,
-        0x90, 0xA0, 0xB0, 0xC0,
+        0x90, 0xAE, 0xB0, 0xC0,
         0xD0, 0xE0, 0xF0, 0x01
     };
-    const char *payload = "Hello, this is test block data!";
+    const char *payload = "hi";
     uint32_t payload_len = strlen(payload);
 
     printf("Sending block ID: %s\n", block_id);

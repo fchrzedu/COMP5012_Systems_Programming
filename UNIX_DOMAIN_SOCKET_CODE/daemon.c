@@ -97,6 +97,7 @@ void bindListen(int server_sock, struct sockaddr_un *server_address) {
     listen(server_sock, 1); // Start listening
 }
 
+
 /* ---------- HANDLES libshare::sendNewBlock() ----------*/
 uint8_t handleSendBlock(int clientfd){
     char id[256] = {0};
@@ -115,20 +116,25 @@ uint8_t handleSendBlock(int clientfd){
         send(clientfd,&resp,sizeof(resp),0);
         return resp;      
     }   
+    syslog(LOG_ERR,"DEBUG ID: %5s",id);
+    
     /* ---------- SECRET HANDLING ----------*/
     recvd =recv(clientfd, secret, sizeof(secret), 0);
     if( recvd != sizeof(secret)){
         syslog(LOG_ERR,"[-] failed to receive secret from client\n");        
         send(clientfd,&resp,sizeof(resp),0);
         return resp;
-    }
+    }   
+ 
+    
     /* ---------- DATA_LENGTH HANDLING ----------*/
     recvd = recv(clientfd, &data_length, sizeof(data_length),0);
     if(recvd != sizeof(data_length)){
         syslog(LOG_ERR,"[-] failed to receive data_length from client\n");
         send(clientfd,&resp,sizeof(resp),0);
         return resp;
-    }
+    }        syslog(LOG_ERR,"DEBUG DATALEN: %5u",data_length);
+
     /* ---------- MALLOC BUFFER ALLOCATING ----------*/
     data = malloc(data_length); /* allocate buffer as large as data_length */
     if(!data){
@@ -138,7 +144,8 @@ uint8_t handleSendBlock(int clientfd){
     }
 
     /* ---------- RECIEVING DATA ALLOCATING ----------*/
-    ssize_t total_received;
+    syslog(LOG_ERR,"receiving data......\n");
+    ssize_t total_received = 0;
     while(total_received < data_length){
         recvd = recv(clientfd, data + total_received, data_length - total_received,0);
         if(recvd < 1){
@@ -148,10 +155,11 @@ uint8_t handleSendBlock(int clientfd){
             return resp;
         }
         total_received += recvd;
-    }
+    }        
+    
     /* ---------- FIND DUPLICATE BLOCK ----------*/
     if(findIndxById(id) != -1){
-        syslog(LOG_ERR,"[-] duplicate block ID: %d",id);
+        syslog(LOG_ERR,"[-] duplicate block ID: %s",id);
         free(data);
         resp = ALREADY_EXISTS_RED;
         send(clientfd,&resp,sizeof(resp),0);
@@ -167,29 +175,18 @@ uint8_t handleSendBlock(int clientfd){
         return resp;
     }
     /* ---------- STORE BLOCK IN STORAGE[] ----------*/
-
-    syslog(LOG_ERR,"[handleSendBlock()] storing block with id: %.20s", id);
-    syslog(LOG_ERR,"storing block with secret: ");
-    for(int i = 0; i < 16; i++){
-        syslog(LOG_ERR,"%02X ",secret[i]);
-    }
-    syslog(LOG_NOTICE, "[handleSendBlock()] Storing data: ");
-    for (size_t i = 0; i < data_length && i < 50; i++) {
-        syslog(LOG_NOTICE, "%c", ((uint8_t *)data)[i]);  // Print data byte by byte as characters
-    }
-    if (data_length > 50) {
-        syslog(LOG_NOTICE, "...");  // Indicate more data exists
-    }
     strncpy(storage[indx].ID,id,sizeof(storage[indx].ID) -1 );
     memcpy(storage[indx].secret,secret,sizeof(secret));
     storage[indx].data = data;
     storage[indx].data_length = data_length;
     storage[indx].is_used = 1;
-    syslog(LOG_ERR,"[+] succesfully stored new block\n");
+
+    
 
     resp = SUCCESS_RES;
     send(clientfd,&resp,sizeof(resp),0);
     free(data);
+    writeStorageToFile("/tmp/strdump.txt");
     return resp;    
 }
 
