@@ -185,10 +185,14 @@ uint8_t handleSendBlock(int clientfd){
 
     resp = SUCCESS_RES;
     send(clientfd,&resp,sizeof(resp),0);
+    
     free(data);
-    writeStorageToFile("/tmp/strdump.txt");
+    
     return resp;    
 }
+
+/* ---------- HANDLES libshare::getBlock() ----------*/
+
 
 /* ---------- CLIENT CONNECT() FROM LIB WORKS ----------*/
 void connectionHandling(int server_sock) {
