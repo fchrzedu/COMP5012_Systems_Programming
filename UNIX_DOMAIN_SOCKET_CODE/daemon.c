@@ -192,7 +192,27 @@ uint8_t handleSendBlock(int clientfd){
 }
 
 /* ---------- HANDLES libshare::getBlock() ----------*/
-
+uint8_t handleGetBlock(int clientfd){
+    char id[256] = {0};
+    uint8_t secret[16];
+    uint8_t resp = FAIL_RES;
+    ssize_t recvd;
+    /* ----- ID HANDLING -----*/    
+    if(recv(clientfd, id, sizeof(id), 0) != sizeof(id)){
+        syslog(LOG_ERR, "[-] handleGetBlock: failed to read ID\n");
+        send(clientfd, &resp, sizeof(resp), 0);
+        return resp;
+    }
+    /* ----- IDENTIFY BLOCK BY ID -----*/
+    int indx = findIndxById(id);
+    if(indx == -1){
+        syslog(LOG_ERR,"[-] handleGetBlock: block not found\n");
+        resp = NOT_FOUND_RES;
+        send(clientfd,&resp,sizeof(resp), 0);
+        return resp;
+    }
+    /* ----- COMPARE SECRETS -----*/
+}
 
 /* ---------- CLIENT CONNECT() FROM LIB WORKS ----------*/
 void connectionHandling(int server_sock) {
