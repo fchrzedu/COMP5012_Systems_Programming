@@ -17,8 +17,8 @@
 #define FAIL_RES 1
 #define ACCESS_DENIED_RES 2
 #define NOT_FOUND_RES 3
-#define ALREADY_EXISTS_RED 4
-
+#define ALREADY_EXISTS_RES 4
+#define TRACE() syslog(LOG_ERR, "TRACE:%s%d", __func__ , __LINE__) /* used for debugging */
 #define SOCKET_PATH "/tmp/unixdomainsocket"
 #define MAX_STORAGE 100  // Max number of blocks to store
 
@@ -161,7 +161,7 @@ uint8_t handleSendBlock(int clientfd){
     if(findIndxById(id) != -1){
         syslog(LOG_ERR,"[-] duplicate block ID: %s",id);
         free(data);
-        resp = ALREADY_EXISTS_RED;
+        resp = ALREADY_EXISTS_RES;
         send(clientfd,&resp,sizeof(resp),0);
         return resp;
     }
@@ -186,33 +186,13 @@ uint8_t handleSendBlock(int clientfd){
     resp = SUCCESS_RES;
     send(clientfd,&resp,sizeof(resp),0);
     
-    free(data);
+   // free(data);
     
     return resp;    
 }
 
 /* ---------- HANDLES libshare::getBlock() ----------*/
-uint8_t handleGetBlock(int clientfd){
-    char id[256] = {0};
-    uint8_t secret[16];
-    uint8_t resp = FAIL_RES;
-    ssize_t recvd;
-    /* ----- ID HANDLING -----*/    
-    if(recv(clientfd, id, sizeof(id), 0) != sizeof(id)){
-        syslog(LOG_ERR, "[-] handleGetBlock: failed to read ID\n");
-        send(clientfd, &resp, sizeof(resp), 0);
-        return resp;
-    }
-    /* ----- IDENTIFY BLOCK BY ID -----*/
-    int indx = findIndxById(id);
-    if(indx == -1){
-        syslog(LOG_ERR,"[-] handleGetBlock: block not found\n");
-        resp = NOT_FOUND_RES;
-        send(clientfd,&resp,sizeof(resp), 0);
-        return resp;
-    }
-    /* ----- COMPARE SECRETS -----*/
-}
+
 
 /* ---------- CLIENT CONNECT() FROM LIB WORKS ----------*/
 void connectionHandling(int server_sock) {
@@ -237,7 +217,8 @@ void connectionHandling(int server_sock) {
         if(recv(client_sock, &code, sizeof(code), 0) != sizeof(code)){
             syslog(LOG_ERR,"[-] failed to read opcode from sharelib\n");
             close(client_sock);
-            exit(EXIT_FAILURE); // change ?? -----------------
+            continue;
+            //exit(EXIT_FAILURE); // change ?? -----------------
 
         }
 
