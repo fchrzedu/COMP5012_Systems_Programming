@@ -31,7 +31,35 @@ typedef struct {
     int is_used; // flag to check whether data block is being used (1 yes | 0 no )
 } DataBlock;
 
+
 static DataBlock storage[MAX_STORAGE];
+
+// Log file pointer
+FILE *log_file = NULL;
+
+// Function to open log file for appending
+void open_log_file() {
+    log_file = fopen("/tmp/daemon_debug.log", "a");  // Open for appending
+    if (!log_file) {
+        perror("Error opening log file");
+        exit(EXIT_FAILURE);
+    }
+}
+
+// Function to write log messages to the log file
+void write_log(const char *msg) {
+    if (log_file) {
+        fprintf(log_file, "%s\n", msg);
+        fflush(log_file);  // Ensure data is written immediately
+    }
+}
+
+// Function to close the log file
+void close_log_file() {
+    if (log_file) {
+        fclose(log_file);
+    }
+}
 /* ---------- DAEMON CLEANUP - DELETED /TMP/ ----------*/
 void cleanup(int server_sock) {
     close(server_sock);
@@ -179,9 +207,7 @@ uint8_t handleSendBlock(int clientfd){
     storage[indx].is_used = 1;
 
     
-
-    resp = SUCCESS_RES;
-    send(clientfd,&resp,sizeof(resp),0);
+    
     
    // free(data);
     

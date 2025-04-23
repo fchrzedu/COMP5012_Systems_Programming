@@ -7,6 +7,7 @@
 #include <sys/un.h>
 #include <syslog.h>
 #include "sharedlib.h"
+
 int connectDaemon(){
     logOpen();
     struct sockaddr_un address;
