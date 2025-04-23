@@ -70,6 +70,7 @@ uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data
     - retrieve a response from the daemon.c - indicate whether storing data was succesful
     - return a value to calling program ( a client ) reflecting daemons resposne
     */
+    char id_buffer[256] = {0};
     int send_fd = connectDaemon(); /* socket to connect to daemon */
     if(send_fd < 0){
         return handleErr(send_fd);
@@ -83,7 +84,7 @@ uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data
     }
 
     /* Sending ID to daemon.c -  */
-    char id_buffer[256] = {0};
+    
     strncpy(id_buffer, ID, sizeof(id_buffer) - 1);
     if(sendAllData(send_fd, id_buffer, sizeof(id_buffer)) != sizeof(id_buffer)){
         syslog(LOG_ERR,"[-sendNewBlock()] failed to send ID to daemon\n");
@@ -117,63 +118,69 @@ uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data
 
     
 }
-
 uint8_t getBlock(char *ID, uint8_t *secret, uint32_t buffer_size, void *buffer){
+    char id_buffer[256] = {0};
     logOpen();
     int get_fd = connectDaemon();
     if(get_fd < 0){
         return handleErr(get_fd);
     }
-    /* ----- SENDING OPCODE TO DAEMON -----*/
-    uint8_t opcode = GET_BLOCK;
+    /* ----- SENDING OPCODE TO DAEMON*/
+    uint8_t opcode = GET_BLOCK;    
     if(sendAllData(get_fd,&opcode,sizeof(opcode)) != sizeof(opcode)){
-        syslog(LOG_ERR, "[-getBlock()] failed to send GET_BLOCK\n");
+        syslog(LOG_ERR,"[-]getBlock() failed to send GET_BLOCK\n");
         return handleErr(get_fd);
     }
-    
-    /* ----- SENDING ID TO DAEMON -----*/
-    char idbuff[256] = {0};
-    /* need to implement if (!ID || strlen(ID) >= sizeof(id_buffer)) {
-    checks whether non-null or fits 
-    */
-    strncpy(idbuff, ID, sizeof(idbuff) - 1 ); // copy ID to idbuff, account for \0
-    if(sendAllData(get_fd,idbuff,sizeof(idbuff)) != sizeof(idbuff)){
-        syslog(LOG_ERR, "[-sendNewBlock()] failed to send ID to daemon\n");
-        return handleErr(get_fd);}
-    /* ----- SENDING SECRET TO DAEMON -----*/
-    if(sendAllData(get_fd, secret, 16) !=16){
-        syslog(LOG_ERR, "[-sendNewBlock()] failed to send secret to daemon\n");
+    /* ----- SENDING ID LENGTH ----- */
+    uint32_t id_len = strlen(ID);
+    if(sendAllData(get_fd,&id_len,sizeof(id_len)) != sizeof(id_len)){
+        syslog(LOG_ERR,"[-]getBlock(): Failed to send data_length\n");
         return handleErr(get_fd);
     }
-    /* ----- RECV() RESPONSE FROM DAEMON-----*/
-    uint8_t resp = receiveAllData(get_fd,&resp, sizeof(resp));
-    if(resp != sizeof(resp)){
-        syslog(LOG_ERR,"[-getBlock()] failed to receive response from daemon\n");
+    /* ----- SENDING ID ----- */
+    strncpy(id_buffer,ID, sizeof(id_buffer)-1);
+    if(sendAllData(get_fd,id_buffer,sizeof(id_buffer)) != sizeof(id_buffer)){
+        syslog(LOG_ERR,"[-]getBlock() failed to send ID\n");
         return handleErr(get_fd);
     }
-    /* ----- NON SUCCESFUL RESPONSE FROM DAEMON-----*/
+    /* ----- SENDING SECRET ----- */
+    if(sendAllData(get_fd,secret,sizeof(secret)) != sizeof(secret)){
+        syslog(LOG_ERR,"[-]getBlock() failed to send secret\n");
+        return handleErr(get_fd);
+    }
+
+    /* ----- AWAIT OPCODE RESPONSE ----- */
+    uint8_t resp = 0;
+    if(receiveAllData(get_fd,&resp,sizeof(resp)) != sizeof(resp)){
+        syslog(LOG_ERR,"[-]getBlock() failed to receive OPCODE from daemon.c\n");
+        return handleErr(get_fd);
+    }
+
+    /* ----- ERROR HANDLE ----- */
     if(resp != SUCCESS_RES){
-        close(get_fd);
-        return resp;
-    }
-    /* ----- RESPONSE = RES_SUCCESS HANDLING -----*/
-    uint32_t data_length;
-    if(receiveAllData(get_fd,&data_length, sizeof(data_length)) != sizeof(data_length)){
-        syslog(LOG_ERR,"[-getBlock()] failed to receive data_length from daemon\n");
-        return handleErr(get_fd);
-    }
-    /* ----- CHECKING BUFFER SIZE EQUALS -----*/
-    if(data_length > idbuff){
-        syslog(LOG_ERR,"[-getBlock()] data_length & buffer_size don't match\n");
         return handleErr(get_fd);
     }
 
+    uint32_t recvd_data_length = 0;
+    if(receiveAllData(get_fd,&recvd_data_length,sizeof(recvd_data_length)) != sizeof(recvd_data_length)){
+        syslog(LOG_ERR,"[-]getBlock() failed to receive data_length\n");
+        return handleErr(get_fd);
+    }
+    /* ----- BUFFER SIZE ----- */
+    if(recvd_data_length > buffer_size){
+        syslog(LOG_ERR,"[-]getBlock() failed to appropriate buffer size \n");
+        return handleErr(get_fd);
+    }
+
+    /* ----- RECEIVE DATA -----*/
+    if(receiveAllData(get_fd,buffer,recvd_data_length) != (ssize_t)recvd_data_length){
+        syslog(LOG_ERR,"[-]getBlock() failed to receive data\n");
+        return handleErr(get_fd);
+    }
     close(get_fd);
-    return resp;
+    return SUCCESS_RES;
 
-
-
-
-
-
+    
 }
+
+

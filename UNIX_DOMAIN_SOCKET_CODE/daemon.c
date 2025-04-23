@@ -97,7 +97,10 @@ void bindListen(int server_sock, struct sockaddr_un *server_address) {
     listen(server_sock, 1); // Start listening
 }
 
-
+uint8_t respond(int fd, uint8_t r){
+    send(fd,&r,sizeof(r),0);
+    return r;
+}
 /* ---------- HANDLES libshare::sendNewBlock() ----------*/
 uint8_t handleSendBlock(int clientfd){
     char id[256] = {0};
@@ -122,8 +125,7 @@ uint8_t handleSendBlock(int clientfd){
     recvd =recv(clientfd, secret, sizeof(secret), 0);
     if( recvd != sizeof(secret)){
         syslog(LOG_ERR,"[-] failed to receive secret from client\n");        
-        send(clientfd,&resp,sizeof(resp),0);
-        return resp;
+        return respond(clientfd, resp);
     }   
  
     
@@ -131,16 +133,14 @@ uint8_t handleSendBlock(int clientfd){
     recvd = recv(clientfd, &data_length, sizeof(data_length),0);
     if(recvd != sizeof(data_length)){
         syslog(LOG_ERR,"[-] failed to receive data_length from client\n");
-        send(clientfd,&resp,sizeof(resp),0);
-        return resp;
-    }        syslog(LOG_ERR,"DEBUG DATALEN: %5u",data_length);
+        return respond(clientfd, resp);
+    }        
 
     /* ---------- MALLOC BUFFER ALLOCATING ----------*/
     data = malloc(data_length); /* allocate buffer as large as data_length */
     if(!data){
         syslog(LOG_ERR,"[-] malloc buffer allocation failed\n");
-        send(clientfd,&resp,sizeof(resp),0);
-        return resp;
+        return respond(clientfd, resp);
     }
 
     /* ---------- RECIEVING DATA ALLOCATING ----------*/
@@ -151,8 +151,7 @@ uint8_t handleSendBlock(int clientfd){
         if(recvd < 1){
             syslog(LOG_ERR,"[-] failed to receive block data\n");
             free(data);
-            send(clientfd,&resp,sizeof(resp),0);
-            return resp;
+            return respond(clientfd, resp);
         }
         total_received += recvd;
     }        
@@ -162,8 +161,7 @@ uint8_t handleSendBlock(int clientfd){
         syslog(LOG_ERR,"[-] duplicate block ID: %s",id);
         free(data);
         resp = ALREADY_EXISTS_RES;
-        send(clientfd,&resp,sizeof(resp),0);
-        return resp;
+        return respond(clientfd, resp);
     }
     /* ---------- FIND FREE STORAGE[] BLOCK ----------*/
     int indx = findFreeBlockIndx();
@@ -171,8 +169,7 @@ uint8_t handleSendBlock(int clientfd){
         syslog(LOG_ERR,"[-] failed to store block. full storage\n");
         free(data);
         resp = FAIL_RES;
-        send(clientfd,&resp,sizeof(resp),0);
-        return resp;
+        return respond(clientfd, resp);
     }
     /* ---------- STORE BLOCK IN STORAGE[] ----------*/
     strncpy(storage[indx].ID,id,sizeof(storage[indx].ID) -1 );
@@ -193,7 +190,74 @@ uint8_t handleSendBlock(int clientfd){
 
 /* ---------- HANDLES libshare::getBlock() ----------*/
 
+uint8_t handleGetBlock(int clientfd){
+    char id[256] = {0};
+    uint8_t secret[16];
+    ssize_t received = 0;
+    uint8_t resp = FAIL_RES;
+    /* ----- RECEIVE ID LENGTH ----- */
+    uint32_t id_len = 0;
+    received = recv(clientfd,&id_len,sizeof(id_len),0);
+    if(received != sizeof(id_len)){
+        syslog(LOG_ERR,"[-]handleGetBlock() failed to receive ID length\n");
+        return respond(clientfd,FAIL_RES);
+    }
+        
+    
+    /* ----- RECEIVE ID ----- */
+    received = recv(clientfd,id,id_len,0);
+    if(received != (ssize_t)id_len){
+        syslog(LOG_ERR,"[-]handleGetBlock() failed to receive ID length\n");
+        return respond(clientfd,FAIL_RES);
+    }id[id_len] = '\0';
 
+    /* ----- RECEIVE SECRET ----- */
+    received = recv(clientfd,secret,sizeof(secret),0);
+    if(received != sizeof(secret)){
+        syslog(LOG_ERR,"[-]handleGetBlock() failed to receive ID length\n");
+        return respond(clientfd,FAIL_RES);
+    }
+    
+
+    /* ----- FIND MATCH ----- */
+    int indx = findIndxById(id);
+    if(indx == -1){
+        syslog(LOG_ERR,"[-]handleGetBlock() ID %s not found \n",id);
+        return respond(clientfd,NOT_FOUND_RES);
+    }
+    /* ----- MEMCMP SECRETS ----- */
+    if(memcmp(secret,storage[indx].secret,sizeof(secret)) != 0){
+        syslog(LOG_ERR,"[-]handleGetBlock() secret memcmp mismatch\n");
+        return respond(clientfd,ACCESS_DENIED_RES);
+    
+    }
+    /* ----- SEND RESPONSE  ----- */
+    if(respond(clientfd,SUCCESS_RES) != SUCCESS_RES){
+        syslog(LOG_ERR,"[-]handleGetBlock() failed to send resp\n");
+        return respond(clientfd,FAIL_RES);
+    }    
+    
+    /* ----- SEND DATA LENGTH (BUFFER SIZE) ----- */
+    uint32_t data_len = storage[indx].data_length;
+    if(send(clientfd,&data_len,sizeof(data_len),0) != sizeof(data_len)){
+        syslog(LOG_ERR,"[-]handleGetBlock() failed to send data length\n");
+        return respond(clientfd,FAIL_RES);
+    }
+    
+
+    /* ----- SEND DATA ----- */
+    uint8_t *dataptr = storage[indx].data;
+    ssize_t total_sent = 0;
+    while(total_sent < data_len){
+        ssize_t sent = send(clientfd,dataptr+total_sent, data_len - total_sent, 0);
+        if(sent <= 0){
+            syslog(LOG_ERR,"[-]handleGetBlock() failed to send data\n");
+            return respond(clientfd,FAIL_RES);
+        }
+        total_sent += sent;
+    }
+    return SUCCESS_RES;
+}
 /* ---------- CLIENT CONNECT() FROM LIB WORKS ----------*/
 void connectionHandling(int server_sock) {
     int client_sock;
@@ -227,7 +291,7 @@ void connectionHandling(int server_sock) {
                 resp = handleSendBlock(client_sock);
                 break;
             case GET_BLOCK:
-                //resp = handleGetBlock(client_sock);
+                resp = handleGetBlock(client_sock);
                 break;
             default:
             /* directly casts FAIL_RES, rather than uint8_t response = FAIL_RES; */
