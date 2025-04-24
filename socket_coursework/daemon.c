@@ -9,6 +9,7 @@
 #include <syslog.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <stdbool.h>
 
 #define SEND 0
 #define GET 1
@@ -34,6 +35,7 @@ typedef struct DataBlock{
 DataBlock *head = NULL;
 static DataBlock storage[MAX_STORAGE];
 
+// DEBUGGIN HERE !!
 void logDebugData(const char *id, uint32_t data_length) {
     FILE *fp = fopen("/tmp/daemon_debug.log", "a");
     if (fp == NULL) {
@@ -124,7 +126,7 @@ void bindListen(int server_sock, struct sockaddr_un *server_address) {
         exit(EXIT_FAILURE);
     }
     syslog(LOG_NOTICE, "[+] Bind() success\n");
-    listen(server_sock, 1); // Start listening
+    listen(server_sock, 2); // Start listening
 }
 
 uint8_t respond(int fd, uint8_t r){
@@ -143,7 +145,7 @@ uint8_t handleSendBlock(int client_sock){
     /* - received ID length -*/
     uint8_t id_len = 0;
     if(recv(client_sock, &id_len,sizeof(id_len),0) != sizeof(id_len)){
-        syslog(LOG_ERR,"[-]handleSendBlock() failed to receive sendBlock()\n");
+        syslog(LOG_ERR,"[-]handleSendBlock() failed to receive id length\n");
         return respond(client_sock, FAIL);
     }
 
@@ -194,10 +196,12 @@ uint8_t handleSendBlock(int client_sock){
     }
     /* - allocate linked pointer storage block -*/
     DataBlock *b = NULL;
+    bool isused = false;
     for(int i = 0; i < MAX_STORAGE; i++){
-        if(!storage[i].used){
+        if(!storage[i].used && !isused){
             b = &storage[i];
-            b->used = 1;            
+            b->used = 1; 
+            isused = true;         
         }
     }
     if(!b){
@@ -221,7 +225,67 @@ uint8_t handleSendBlock(int client_sock){
 
 }
 
+uint8_t handleGetBlock(int client_sock){
+    /*
+    1. send op code - connectionHandling()
+    2. recv Id length
+    3. recv ID
+    4. recv secret 
+    5. send response
+    */
+    /* -- recv id length -- */
 
+    uint8_t id_len = 0;
+    if(recv(client_sock, &id_len,sizeof(id_len),0) != sizeof(id_len)){
+        syslog(LOG_ERR,"[-]handleGetBlock() failed to receive ID length\n");
+        return respond(client_sock, FAIL);
+    }
+    /* -- recv id -- */
+    char idbuffer[256] = {0};
+    if(recv(client_sock, idbuffer, sizeof(idbuffer), 0) != sizeof(idbuffer)){
+        syslog(LOG_ERR,"[-]handleGetBlock() failed to receive ID\n");
+        return respond(client_sock,FAIL);
+    }
+    /* -- receive secret -- */
+    uint8_t secret[16] = {0};
+    if(recv(client_sock, secret, 16, 0) != 16){
+        syslog(LOG_ERR,"[-]handleGetBlock() failed to receive secret\n");
+        return respond(client_sock,FAIL);
+    }
+    /* --  compare ID and secret -- */
+    DataBlock *b = head;
+    while(b!=NULL){
+        if(strncmp(b->ID,idbuffer,sizeof(b->ID)) == 0){
+            if(memcmp(b->secret, secret, 16) != 0){
+                syslog(LOG_ERR,"[-]handleGetBlock() secret mistmatch for ID: %s\n",idbuffer);
+                return respond(client_sock, ACCESS_DENIED);
+            }
+            respond(client_sock,SUCCESS);
+
+            /* -- send data length -- */
+            if (send(client_sock, &b->data_length, sizeof(b->data_length), 0) != sizeof(b->data_length)) {
+                syslog(LOG_ERR,"[-]handleGetBlock() failed to send data_length\n");
+                return FAIL;
+            }
+            /* -- send data --*/
+            ssize_t total_sent = 0;
+            while(total_sent < b->data_length){
+                ssize_t sent = send(client_sock, b->data + total_sent, b->data_length - total_sent,0);
+                if(sent < 1){
+                    syslog(LOG_ERR,"[-]handleGetBlock() failed to send data\n");
+                    return FAIL;
+                }
+                total_sent += sent;
+            }
+            return SUCCESS;                
+        }
+        b = b->next;        
+    }
+    syslog(LOG_ERR,"[-]handleGetBlock() no block exists for ID: %s",idbuffer);
+    return respond(client_sock, NOT_FOUND);
+    
+
+}
 /* ---------- CLIENT CONNECT() FROM LIB WORKS ----------*/
 void connectionHandling(int server_sock) {
     int client_sock;
@@ -254,12 +318,15 @@ void connectionHandling(int server_sock) {
             case SEND:
                 resp = handleSendBlock(client_sock);
                 break;
+            case GET:
+                resp = handleGetBlock(client_sock);
+                break;
             default:
                 syslog(LOG_ERR,"[-] Unknown opcode received: %d",code);
                 send(client_sock, &(uint8_t){FAIL}, sizeof(uint8_t),0);
-                break;
-                
+                break;                
         }
+        close(client_sock);
 
         
     }
