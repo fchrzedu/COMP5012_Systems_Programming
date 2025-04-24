@@ -21,7 +21,7 @@
 #define SOCKET_PATH "/tmp/domainsocket"
 #define MAX_STORAGE 50  // Max number of blocks to stor
 /* ----- DATA STORAGE ----- */
-typedef struct {
+typedef struct DataBlock{
     char ID[256];
     uint8_t secret[16];
     uint8_t *data;
@@ -30,8 +30,56 @@ typedef struct {
 
     struct DataBlock *next;
 }DataBlock;
+
 DataBlock *head = NULL;
 static DataBlock storage[MAX_STORAGE];
+
+void logDebugData(const char *id, uint32_t data_length) {
+    FILE *fp = fopen("/tmp/daemon_debug.log", "a");
+    if (fp == NULL) {
+        syslog(LOG_ERR, "[-] Failed to open debug log file\n");
+        return;
+    }
+
+    // Find the matching block in memory (linked list)
+    DataBlock *b = head;
+    while (b != NULL) {
+        if (strncmp(b->ID, id, sizeof(b->ID)) == 0) {
+            break;
+        }
+        b = b->next;
+    }
+
+    if (b == NULL || b->data == NULL) {
+        fprintf(fp, "[-] logDebugData(): No matching data block found for ID='%s'\n", id);
+        fclose(fp);
+        return;
+    }
+
+    // Start logging
+    fprintf(fp, "\n[+] Stored Block Info:\n");
+    fprintf(fp, "    ID         : %s\n", b->ID);
+    fprintf(fp, "    Data Length: %u bytes\n", b->data_length);
+
+    // Log secret in hex
+    fprintf(fp, "    Secret     : ");
+    for (int i = 0; i < 16; ++i) {
+        fprintf(fp, "%02X", b->secret[i]);
+        if (i < 15) fprintf(fp, ":");
+    }
+    fprintf(fp, "\n");
+
+    // Log data as hex for safety (avoid printing raw binary)
+    fprintf(fp, "    Data       : ");
+    for (uint32_t i = 0; i < b->data_length; ++i) {
+        fprintf(fp, "%02X", b->data[i]);
+        if ((i + 1) % 16 == 0) fprintf(fp, "\n                  "); // Align next row
+        else if (i < b->data_length - 1) fprintf(fp, " ");
+    }
+    fprintf(fp, "\n");
+
+    fclose(fp);
+}
 
 
 /* ---------- DAEMON CLEANUP - DELETED /TMP/ ----------*/
@@ -83,6 +131,97 @@ uint8_t respond(int fd, uint8_t r){
     send(fd,&r,sizeof(r),0);
     return r;
 }
+
+uint8_t handleSendBlock(int client_sock){
+    /*
+    2. send ID 
+    3. send secret
+    4. send data length
+    5. send data
+    */
+
+    /* - received ID length -*/
+    uint8_t id_len = 0;
+    if(recv(client_sock, &id_len,sizeof(id_len),0) != sizeof(id_len)){
+        syslog(LOG_ERR,"[-]handleSendBlock() failed to receive sendBlock()\n");
+        return respond(client_sock, FAIL);
+    }
+
+    /* - received ID -*/
+    char idbuffer[256] = {0};
+    if(recv(client_sock, idbuffer, sizeof(idbuffer), 0) != sizeof(idbuffer)){
+        syslog(LOG_ERR,"[-]handleSendBlock() failed to receive ID\n");
+        return respond(client_sock,FAIL);
+    }
+    /* - check duplicate ID -*/
+    DataBlock *currentptr = head;
+    while(currentptr != NULL){
+        if (strncmp(currentptr->ID, idbuffer, sizeof(currentptr->ID)) == 0) {
+            syslog(LOG_ERR,"[-]handleSendBlock() duplicate ID\n");
+            return respond(client_sock,FAIL);
+        }
+        currentptr = currentptr->next;
+
+    }
+    /* - receive secret - */
+    uint8_t secret[16] = {0};
+    if(recv(client_sock, secret, 16, 0) != 16){
+        syslog(LOG_ERR,"[-]handleSendBlock() failed to receive secret\n");
+        return respond(client_sock,FAIL);
+    }
+    /* - receive data length - */
+    uint32_t data_length = 0;
+    if(recv(client_sock, &data_length, sizeof(data_length), 0) != sizeof(data_length)){
+        syslog(LOG_ERR,"[-]handleSendBlock() failed to receive data_length\n");
+        return respond(client_sock,FAIL);
+    }
+    /* - receive data - */
+    uint8_t *data = malloc(data_length);
+    if(!data){
+        syslog(LOG_ERR,"[-]handleSendBlock() failed to malloc for data_length\n");
+        return respond(client_sock,FAIL);
+    }
+
+    ssize_t totalread = 0;
+    while(totalread < data_length){
+        ssize_t received = recv(client_sock, data + totalread, data_length - totalread, 0);
+        if(received < 1){
+            syslog(LOG_ERR,"[-]handleSendBlock() failed to read all of data\n");
+            free(data);
+            return respond(client_sock,FAIL);
+        }
+        totalread += received;
+    }
+    /* - allocate linked pointer storage block -*/
+    DataBlock *b = NULL;
+    for(int i = 0; i < MAX_STORAGE; i++){
+        if(!storage[i].used){
+            b = &storage[i];
+            b->used = 1;            
+        }
+    }
+    if(!b){
+        syslog(LOG_ERR,"[-]handleSendBlock() no storage available\n");
+        return respond(client_sock,FAIL);
+    }
+    /* - populate data struct and link to next head -*/
+    strncpy(b->ID,idbuffer,sizeof(b->ID)-1);
+    memcpy(b->secret,secret,16);
+    b->data = data;
+    b->data_length = data_length;
+    b->next = head;
+    head = b;
+
+    logDebugData(b->ID,b->data_length);
+
+    
+    return respond(client_sock, SUCCESS);
+    
+
+
+}
+
+
 /* ---------- CLIENT CONNECT() FROM LIB WORKS ----------*/
 void connectionHandling(int server_sock) {
     int client_sock;
@@ -109,6 +248,17 @@ void connectionHandling(int server_sock) {
             continue;
             //exit(EXIT_FAILURE); // change ?? -----------------
 
+        }
+
+        switch(code){
+            case SEND:
+                resp = handleSendBlock(client_sock);
+                break;
+            default:
+                syslog(LOG_ERR,"[-] Unknown opcode received: %d",code);
+                send(client_sock, &(uint8_t){FAIL}, sizeof(uint8_t),0);
+                break;
+                
         }
 
         
@@ -151,7 +301,7 @@ void daemonize() {
 
 int main() {
     printf("About to daemonsize\n");
-    openlog(">>DAEMONSOCKETSERV", LOG_PID, LOG_DAEMON);
+    openlog("*DAEMON*", LOG_PID, LOG_DAEMON);
     daemonize();
 
     int server_sock = initSocket();

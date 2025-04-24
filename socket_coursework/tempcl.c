@@ -3,24 +3,23 @@
 #include <string.h>
 #include "lib.h"
 
-int main() {
-    char *testID = "block123";
+
+int main(){
+    char *id = "TestId001";
     uint8_t secret[16] = {
-        0xde, 0xad, 0xbe, 0xef,
-        0xca, 0xfe, 0xba, 0xbe,
-        0x00, 0x11, 0x22, 0x33,
-        0x44, 0x55, 0x66, 0x77
+        0x01, 0x02, 0x03, 0x04,
+        0x05, 0x06, 0x07, 0x08,
+        0x09, 0x0A, 0x0B, 0x0C,
+        0x0D, 0x0E, 0x0F, 0x10
     };
+    char *message = "hello daemon!";
+    uint32_t data_length = strlen(message);
 
-    char testData[] = "Hello, daemon. This is a test block!";
-    uint32_t dataLength = strlen(testData) + 1;  // include null terminator
-
-    uint8_t result = sendNewBlock(testID, secret, dataLength, testData);
-
-    if (result == SUCCESS) {
-        printf("[+] Block sent successfully!\n");
+    uint8_t result = sendNewBlock(id,secret,data_length,message);
+    if (result == 0) {
+        printf("[+] Block sent successfully.\n");
     } else {
-        printf("[-] Failed to send block to daemon.\n");
+        printf("[-] Failed to send block. Error code: %d\n", result);
     }
 
     return 0;

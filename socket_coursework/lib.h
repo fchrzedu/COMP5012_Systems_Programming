@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define SOCKET_PATH "/tmp/daemon_unix_socket"
+#define SOCKET_PATH "/tmp/domainsocket"
 
 /* ----- SHARED LIB SEND OP CODES ----- */
 #define SEND 0
