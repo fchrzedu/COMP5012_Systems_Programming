@@ -1,34 +1,27 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-#include <stdlib.h>
-#include "lib.h"  
-
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <syslog.h>
 #include "lib.h"
 
-#define OPCODE_TEST 0x01  // Arbitrary opcode for testing
-
 int main() {
-    int sockfd = connectDaemon();
-    if (sockfd < 0) {
-        fprintf(stderr, "[-] Failed to connect to daemon.\n");
-        return EXIT_FAILURE;
+    char *testID = "block123";
+    uint8_t secret[16] = {
+        0xde, 0xad, 0xbe, 0xef,
+        0xca, 0xfe, 0xba, 0xbe,
+        0x00, 0x11, 0x22, 0x33,
+        0x44, 0x55, 0x66, 0x77
+    };
+
+    char testData[] = "Hello, daemon. This is a test block!";
+    uint32_t dataLength = strlen(testData) + 1;  // include null terminator
+
+    uint8_t result = sendNewBlock(testID, secret, dataLength, testData);
+
+    if (result == SUCCESS) {
+        printf("[+] Block sent successfully!\n");
+    } else {
+        printf("[-] Failed to send block to daemon.\n");
     }
 
-    uint8_t opcode = OPCODE_TEST;
-    ssize_t sent = send(sockfd, &opcode, sizeof(opcode), 0);
-    if (sent != sizeof(opcode)) {
-        syslog(LOG_ERR, "[-] Failed to send opcode to daemon\n");
-        close(sockfd);
-        return EXIT_FAILURE;
-    }
-
-    printf("[+] Sent opcode %d to daemon\n", opcode);
-    close(sockfd);
-    return EXIT_SUCCESS;
+    return 0;
 }

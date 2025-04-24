@@ -9,15 +9,17 @@
 #include <syslog.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#define SOCKET_PATH "/tmp/daemon_unix_socket"
-/* ----- DAEMON CLEANUP - UNLINK(TMP) ----- */
-void cleanup(int server_sock) {
-    close(server_sock);
-    unlink(SOCKET_PATH);
-    closelog();
-    syslog(LOG_NOTICE, "[+] Daemon shutdown");
-    exit(EXIT_SUCCESS);
-}
+
+#define SEND 0
+#define GET 1
+
+#define SUCCESS 0
+#define FAIL 1
+#define ACCESS_DENIED 2
+#define NOT_FOUND 3
+#define ALREADY_EXISTS 4
+#define SOCKET_PATH "/tmp/domainsocket"
+#define MAX_STORAGE 50  // Max number of blocks to stor
 /* ----- DATA STORAGE ----- */
 typedef struct {
     char ID[256];
@@ -28,27 +30,41 @@ typedef struct {
 
     struct DataBlock *next;
 }DataBlock;
+DataBlock *head = NULL;
+static DataBlock storage[MAX_STORAGE];
 
-/* ----- INITIALISES SERVER UNIX SOCKET */
+
+/* ---------- DAEMON CLEANUP - DELETED /TMP/ ----------*/
+void cleanup(int server_sock) {
+    close(server_sock);
+    unlink(SOCKET_PATH);
+    closelog();
+    syslog(LOG_NOTICE, "[+] Daemon shutdown");
+    exit(EXIT_SUCCESS);
+}
+/* ---------- CREATES SERVER SOCKET ----------*/
+
 int initSocket() {
     int server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if (server_sock < 0) {
-        syslog(LOG_ERR, "[-]initSocket() server socket creation failed!\n");
+        syslog(LOG_ERR, "[-] Server socket creation failed!\n");
         exit(EXIT_FAILURE);
     }
+    syslog(LOG_NOTICE, "[+] socket() done");
     return server_sock;
 }
-/* ----- SETS UP SOCKET PATH ----- */
+
 void pathLogSetup(char *buff, size_t buff_size) {
     memset(buff, 0, buff_size); // Fill buffer with 0s
     strncpy(buff, SOCKET_PATH, buff_size - 1); // Copy the path
     syslog(LOG_NOTICE, "testbuf = %s", buff);
 }
+/* ---------- SERVER ADDRESS SETUP ----------*/
 void serverSetup(struct sockaddr_un *server_address) {
     memset(server_address, 0, sizeof(struct sockaddr_un)); // Clear struct
     (*server_address).sun_family = AF_UNIX; // Set socket family
     strncpy((*server_address).sun_path, SOCKET_PATH, sizeof((*server_address).sun_path) - 1); // Copy path
-    syslog(LOG_NOTICE, "[+]serverSetup Memset worked\n");
+    syslog(LOG_NOTICE, "[+] Memset worked");
 }
 /* ---------- BIND() & LISTEN() ----------*/
 void bindListen(int server_sock, struct sockaddr_un *server_address) {
@@ -62,6 +78,7 @@ void bindListen(int server_sock, struct sockaddr_un *server_address) {
     syslog(LOG_NOTICE, "[+] Bind() success\n");
     listen(server_sock, 1); // Start listening
 }
+
 uint8_t respond(int fd, uint8_t r){
     send(fd,&r,sizeof(r),0);
     return r;
@@ -89,8 +106,8 @@ void connectionHandling(int server_sock) {
         if(recv(client_sock, &code, sizeof(code), 0) != sizeof(code)){
             syslog(LOG_ERR,"[-] failed to read opcode from sharelib\n");
             close(client_sock);
-            exit(EXIT_FAILURE); // change here to RES_FAIL
-            
+            continue;
+            //exit(EXIT_FAILURE); // change ?? -----------------
 
         }
 
@@ -132,12 +149,9 @@ void daemonize() {
     syslog(LOG_NOTICE, "[+] Daemon initialized and detached");
 }
 
-
-
-
-int main(){
+int main() {
     printf("About to daemonsize\n");
-    openlog("DAEMON", LOG_PID, LOG_DAEMON);
+    openlog(">>DAEMONSOCKETSERV", LOG_PID, LOG_DAEMON);
     daemonize();
 
     int server_sock = initSocket();
@@ -151,5 +165,4 @@ int main(){
     cleanup(server_sock);
 
     return 0;
-
 }
