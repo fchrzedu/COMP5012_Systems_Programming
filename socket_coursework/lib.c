@@ -39,6 +39,15 @@ void logOpen(){
     openlog("LIB", LOG_PID | LOG_CONS, LOG_USER);
 }
 
+uint8_t sendData(int fd, void *data, size_t datasize){
+    if(send(fd, data, datasize, 0) != datasize){
+        syslog(LOG_ERR,"[-]sendData() failed to send data\n");
+        return handleErr(fd);
+    }
+}
+uint8_t sendIDWithLength(int fd, char*ID);
+uint8_t sendSecret(int fd, uint8_t *secret);
+uint8_t receiveData(int fd, void *buff, size_t buff_size);
 
 uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data){
     /*
@@ -155,17 +164,7 @@ uint8_t getBlock(char *ID, uint8_t *secret, uint32_t buffer_size, void *buffer){
         return handleErr(sockfd);
 
     }
-    /*
-    uint32_t totalrecvd = 0;
-    uint8_t *dptr = (uint8_t*)buffer;
-    while(totalrecvd < data_length){
-        ssize_t recvd = recv(sockfd, dptr + totalrecvd, data_length - totalrecvd, 0);
-        if(recvd < 1){
-            syslog(LOG_ERR,"[-]getBlock() failed to receive all data\n");
-            return handleErr(sockfd);
-        }
-        totalrecvd += recvd;
-    }*/
+    
     
     uint32_t total_read = 0;
     while(total_read < data_length){
@@ -181,5 +180,20 @@ uint8_t getBlock(char *ID, uint8_t *secret, uint32_t buffer_size, void *buffer){
     return SUCCESS;
 
 }
+
+
+
+/* -- testing code here for receiving data from the daemon --- */
+/*
+    uint32_t totalrecvd = 0;
+    uint8_t *dptr = (uint8_t*)buffer;
+    while(totalrecvd < data_length){
+        ssize_t recvd = recv(sockfd, dptr + totalrecvd, data_length - totalrecvd, 0);
+        if(recvd < 1){
+            syslog(LOG_ERR,"[-]getBlock() failed to receive all data\n");
+            return handleErr(sockfd);
+        }
+        totalrecvd += recvd;
+    }*/
 
 

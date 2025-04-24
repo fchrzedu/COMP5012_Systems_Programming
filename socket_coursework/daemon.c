@@ -226,14 +226,7 @@ uint8_t handleSendBlock(int client_sock){
 }
 
 uint8_t handleGetBlock(int client_sock){
-    /*
-    1. send op code - connectionHandling()
-    2. recv Id length
-    3. recv ID
-    4. recv secret 
-    5. send response
-    */
-    /* -- recv id length -- */
+    
 
     uint8_t id_len = 0;
     if(recv(client_sock, &id_len,sizeof(id_len),0) != sizeof(id_len)){
