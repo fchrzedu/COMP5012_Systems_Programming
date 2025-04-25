@@ -25,7 +25,12 @@ uint8_t handleErr(int fd); // Handles response FAIL
 /* ----- helper functions for sendNewBlock() & getBlock() ----- */
 bool sendOpCode(int fd, uint8_t opcode);
 bool sendIDLength(int fd, char*ID);
-
+bool sendOpCode(int fd, uint8_t opcode);
+bool sendIDAndLength(int fd, char*ID, int flag);
+bool sendSecret(int fd, uint8_t *secret);
+bool sendDataLength(int fd, uint32_t d_len);
+bool sendActualData(int fd, void *d, uint32_t d_len);
+uint8_t receiveResponse(int fd);
 
 uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data); // Sends a new block
 uint8_t getBlock(char *ID, uint8_t *secret, uint32_t buffer_size, void *buffer); // Retreives block from daemon - prints to client
