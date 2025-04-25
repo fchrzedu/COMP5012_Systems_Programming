@@ -21,6 +21,7 @@
 #define ACCESS_DENIED 2
 #define NOT_FOUND 3
 #define ALREADY_EXISTS 4
+
 #define SOCKET_PATH "/tmp/domainsocket"
 #define MAX_STORAGE 50  // Max number of blocks to store
 
@@ -53,45 +54,46 @@ void logDebugData(const char *id, uint32_t data_length) {
         syslog(LOG_ERR, "[-] Failed to open debug log file\n");
         return;
     }
-
+    else{
     // Find the matching block in memory (linked list)
-    DataBlock *b = head;
-    while (b != NULL) {
-        if (strncmp(b->ID, id, sizeof(b->ID)) == 0) {
-            break;
+        DataBlock *b = head;
+        while (b != NULL) {
+            if (strncmp(b->ID, id, sizeof(b->ID)) == 0) {
+                break;
+            }
+            b = b->next;
         }
-        b = b->next;
-    }
 
-    if (b == NULL || b->data == NULL) {
-        fprintf(fp, "[-] logDebugData(): No matching data block found for ID='%s'\n", id);
+        if (b == NULL || b->data == NULL) {
+            fprintf(fp, "[-] logDebugData(): No matching data block found for ID='%s'\n", id);
+            fclose(fp);
+            return;
+        }
+
+        // Start logging
+        fprintf(fp, "\n[+] Stored Block Info:\n");
+        fprintf(fp, "ID: %s\n", b->ID);
+        fprintf(fp, "Data Length: %u bytes\n", b->data_length);
+
+        // Log secret in hex
+        fprintf(fp, "Secret     : ");
+        for (int i = 0; i < 16; ++i) {
+            fprintf(fp, "%02X", b->secret[i]);
+            if (i < 15) {fprintf(fp, "|");}
+        }
+        fprintf(fp, "\n");
+
+        // Log data as hex for safety (avoid printing raw binary)
+        fprintf(fp, "Data       : ");
+        for (uint32_t i = 0; i < b->data_length; ++i) {
+            fprintf(fp, "%02X", b->data[i]);
+            if ((i + 1) % 16 == 0) fprintf(fp, "\n"); // Align next row
+            else if (i < b->data_length - 1) fprintf(fp, " ");
+        }
+        fprintf(fp, "\n");
+
         fclose(fp);
-        return;
     }
-
-    // Start logging
-    fprintf(fp, "\n[+] Stored Block Info:\n");
-    fprintf(fp, "    ID         : %s\n", b->ID);
-    fprintf(fp, "    Data Length: %u bytes\n", b->data_length);
-
-    // Log secret in hex
-    fprintf(fp, "    Secret     : ");
-    for (int i = 0; i < 16; ++i) {
-        fprintf(fp, "%02X", b->secret[i]);
-        if (i < 15) fprintf(fp, ":");
-    }
-    fprintf(fp, "\n");
-
-    // Log data as hex for safety (avoid printing raw binary)
-    fprintf(fp, "    Data       : ");
-    for (uint32_t i = 0; i < b->data_length; ++i) {
-        fprintf(fp, "%02X", b->data[i]);
-        if ((i + 1) % 16 == 0) fprintf(fp, "\n                  "); // Align next row
-        else if (i < b->data_length - 1) fprintf(fp, " ");
-    }
-    fprintf(fp, "\n");
-
-    fclose(fp);
 }
 
 
@@ -311,8 +313,9 @@ void connectionHandling(int server_sock) {
     socklen_t client_len;
     uint8_t code; /* OPCODE */
     uint8_t resp; /* STORED RESPONSE FLAG*/
+    int max_clients = 0;
 
-    while (1) {
+    while (max_clients < 10) {
         client_len = sizeof(client_address);
         client_sock = accept(server_sock, (struct sockaddr *)&client_address, &client_len);
 
@@ -345,11 +348,8 @@ void connectionHandling(int server_sock) {
                 break;                
         }
         close(client_sock);
-
-        
-    }
-        
-        
+        max_clients +=1;        
+    }       
 }
 
 /* ---------- DAEMONIZES ----------*/
@@ -385,7 +385,7 @@ void daemonize() {
 }
 
 int main() {
-    printf("About to daemonsize\n");
+    printf("About to daemonsize, /var/log/messages under 'DAEMON'\n");
     openlog("*DAEMON*", LOG_PID, LOG_DAEMON);
     daemonize();
 
