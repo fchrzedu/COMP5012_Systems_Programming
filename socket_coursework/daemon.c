@@ -145,28 +145,43 @@ uint8_t respond(int fd, uint8_t r){
     send(fd,&r,sizeof(r),0);
     return r;
 }
-
+bool receiveAll(int sfd, void *b, size_t len){
+    size_t tot = 0; ssize_t received = 0;
+    while(tot<len){
+        received = recv(sfd, (char*)b + tot, len - tot, 0);
+        if(received <1 ){
+            return false;
+        }
+        tot+=received;
+    }
+    return true;
+}
+bool sendAll(int sfd, const void *b, size_t len){
+    size_t tot = 0; ssize_t sent = 0;
+    while(tot < len){
+        sent = send(sfd, (const char*)b + tot, len - tot, 0);
+        if(sent <1){return false;}
+        tot+=sent;
+    }
+    return true;
+}
 uint8_t handleSendBlock(int client_sock){
-    /*
-    2. send ID 
-    3. send secret
-    4. send data length
-    5. send data
-    */
-
-    /* - received ID length -*/
+    
     uint8_t id_len = 0;
-    if(recv(client_sock, &id_len,sizeof(id_len),0) != sizeof(id_len)){
+    /* -- receive ID length -- */
+    if(!receiveAll(client_sock, &id_len, sizeof(id_len))){
         syslog(LOG_ERR,"[-]handleSendBlock() failed to receive id length\n");
         return respond(client_sock, FAIL);
-    }
+    }    
 
     /* - received ID -*/
     char idbuffer[256] = {0};
-    if(recv(client_sock, idbuffer, sizeof(idbuffer), 0) != sizeof(idbuffer)){
+
+    if(!receiveAll(client_sock, idbuffer, sizeof(idbuffer))){
         syslog(LOG_ERR,"[-]handleSendBlock() failed to receive ID\n");
         return respond(client_sock,FAIL);
     }
+
     /* - check duplicate ID -*/
     DataBlock *currentptr = head;
     while(currentptr != NULL){
@@ -179,16 +194,18 @@ uint8_t handleSendBlock(int client_sock){
     }
     /* - receive secret - */
     uint8_t secret[16] = {0};
-    if(recv(client_sock, secret, 16, 0) != 16){
+    if(!receiveAll(client_sock,secret,16)){
         syslog(LOG_ERR,"[-]handleSendBlock() failed to receive secret\n");
         return respond(client_sock,FAIL);
     }
+    
     /* - receive data length - */
     uint32_t data_length = 0;
-    if(recv(client_sock, &data_length, sizeof(data_length), 0) != sizeof(data_length)){
+    if(!receiveAll(client_sock,&data_length,sizeof(data_length))){
         syslog(LOG_ERR,"[-]handleSendBlock() failed to receive data_length\n");
         return respond(client_sock,FAIL);
     }
+    
     /* - receive data - */
     uint8_t *data = malloc(data_length);
     if(!data){
@@ -196,16 +213,12 @@ uint8_t handleSendBlock(int client_sock){
         return respond(client_sock,FAIL);
     }
 
-    ssize_t totalread = 0;
-    while(totalread < data_length){
-        ssize_t received = recv(client_sock, data + totalread, data_length - totalread, 0);
-        if(received < 1){
-            syslog(LOG_ERR,"[-]handleSendBlock() failed to read all of data\n");
-            free(data);
-            return respond(client_sock,FAIL);
-        }
-        totalread += received;
+    if(!receiveAll(client_sock, data, data_length)){
+        syslog(LOG_ERR,"[-]handleSendBlock() failed to read all of data\n");
+        free(data);
+        return respond(client_sock,FAIL);
     }
+    
     /* - allocate linked pointer storage block -*/
     DataBlock *b = NULL;
     bool isused = false;
@@ -241,22 +254,27 @@ uint8_t handleGetBlock(int client_sock){
     
 
     uint8_t id_len = 0;
-    if(recv(client_sock, &id_len,sizeof(id_len),0) != sizeof(id_len)){
+    if(!receiveAll(client_sock, &id_len, sizeof(id_len))){
         syslog(LOG_ERR,"[-]handleGetBlock() failed to receive ID length\n");
         return respond(client_sock, FAIL);
     }
+    
+    
+        
     /* -- recv id -- */
     char idbuffer[256] = {0};
-    if(recv(client_sock, idbuffer, sizeof(idbuffer), 0) != sizeof(idbuffer)){
+    if(!receiveAll(client_sock, idbuffer, sizeof(idbuffer))){
         syslog(LOG_ERR,"[-]handleGetBlock() failed to receive ID\n");
         return respond(client_sock,FAIL);
     }
+      
     /* -- receive secret -- */
     uint8_t secret[16] = {0};
-    if(recv(client_sock, secret, 16, 0) != 16){
+    if(!receiveAll(client_sock, secret, 16)){
         syslog(LOG_ERR,"[-]handleGetBlock() failed to receive secret\n");
         return respond(client_sock,FAIL);
     }
+    
     /* --  compare ID and secret -- */
     DataBlock *b = head;
     while(b!=NULL){
@@ -268,20 +286,15 @@ uint8_t handleGetBlock(int client_sock){
             respond(client_sock,SUCCESS);
 
             /* -- send data length -- */
-            if (send(client_sock, &b->data_length, sizeof(b->data_length), 0) != sizeof(b->data_length)) {
+            if(!sendAll(client_sock, &b->data_length,sizeof(b->data_length))){
                 syslog(LOG_ERR,"[-]handleGetBlock() failed to send data_length\n");
                 return FAIL;
-            }
+            }            
             /* -- send data --*/
-            ssize_t total_sent = 0;
-            while(total_sent < b->data_length){
-                ssize_t sent = send(client_sock, b->data + total_sent, b->data_length - total_sent,0);
-                if(sent < 1){
-                    syslog(LOG_ERR,"[-]handleGetBlock() failed to send data\n");
-                    return FAIL;
-                }
-                total_sent += sent;
-            }
+            if(!sendAll(client_sock, b->data, b->data_length)){
+                syslog(LOG_ERR,"[-]handleGetBlock() failed to send data\n");
+                return FAIL;
+            }            
             return SUCCESS;                
         }
         b = b->next;        
