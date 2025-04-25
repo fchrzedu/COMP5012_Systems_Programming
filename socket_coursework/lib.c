@@ -166,8 +166,10 @@ uint8_t getBlock(char *ID, uint8_t *secret, uint32_t buffer_size, void *buffer){
     }
     
     
-    uint32_t total_read = 0;
-    while(total_read < data_length){
+    uint32_t total_read = 0; // tracks the data received
+    while(total_read < data_length){ // ensures we keep reading until all is read
+        // buffer pointer moves forward by 'total_read', to ensure additional data doesn't overwrite
+        // ensures when called again, buffer starts at new position
         ssize_t recvd = recv(sockfd, buffer + total_read, data_length - total_read, 0);
         if(recvd < 1){
             syslog(LOG_ERR,"[-]getBlock() failed to receive all of data\n");

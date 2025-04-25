@@ -10,6 +10,8 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <stdbool.h>
+#include <time.h>
+
 
 #define SEND 0
 #define GET 1
@@ -20,7 +22,14 @@
 #define NOT_FOUND 3
 #define ALREADY_EXISTS 4
 #define SOCKET_PATH "/tmp/domainsocket"
-#define MAX_STORAGE 50  // Max number of blocks to stor
+#define MAX_STORAGE 50  // Max number of blocks to store
+
+/* ----- PERMISSION AND SECRETS -----*/
+typedef struct Permission{
+    uint8_t secret[16];
+    int perm;
+    struct Permission *next;
+} Permission;
 /* ----- DATA STORAGE ----- */
 typedef struct DataBlock{
     char ID[256];
@@ -28,6 +37,8 @@ typedef struct DataBlock{
     uint8_t *data;
     uint32_t data_length;
     int used;
+    //time_t updated_time;
+    //Permission *Permissions;
 
     struct DataBlock *next;
 }DataBlock;
@@ -126,10 +137,11 @@ void bindListen(int server_sock, struct sockaddr_un *server_address) {
         exit(EXIT_FAILURE);
     }
     syslog(LOG_NOTICE, "[+] Bind() success\n");
-    listen(server_sock, 2); // Start listening
+    listen(server_sock, 10); // Start listening - at the moment 2 clients
 }
 
 uint8_t respond(int fd, uint8_t r){
+    /* -- sends response to client --*/
     send(fd,&r,sizeof(r),0);
     return r;
 }
