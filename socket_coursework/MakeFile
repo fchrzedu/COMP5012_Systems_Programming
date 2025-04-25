@@ -1,0 +1,21 @@
+CC = clang
+CFLAGS = 
+
+all: clsend clget da clsend2
+
+lib.o: lib.c lib.h
+	$(CC) -c $(CFLAGS) lib.c -o lib.o
+
+clsend: send_client.c lib.o
+	$(CC) $(CFLAGS) -o clsend send_client.c lib.o
+
+clget: get_client.c lib.o
+	$(CC) $(CFLAGS) -o clget get_client.c lib.o
+
+da: daemon.c
+	$(CC) $(CFLAGS) -o da daemon.c
+
+clsend2: anotherclientsend.c lib.o
+	$(CC) $(CFLAGS) -o clsend2 anotherclientsend.c lib.o
+clean:
+	rm -f *.o clsend clget da clsend2
