@@ -76,7 +76,7 @@ void logDebugData(const char *id, uint32_t data_length) {
         fprintf(fp, "Data Length: %u bytes\n", b->data_length);
 
         // Log secret in hex
-        fprintf(fp, "Secret     : ");
+        fprintf(fp, "Secret: ");
         for (int i = 0; i < 16; ++i) {
             fprintf(fp, "%02X", b->secret[i]);
             if (i < 15) {fprintf(fp, "|");}
@@ -84,14 +84,13 @@ void logDebugData(const char *id, uint32_t data_length) {
         fprintf(fp, "\n");
 
         // Log data as hex for safety (avoid printing raw binary)
-        fprintf(fp, "Data       : ");
+        fprintf(fp, "Data: ");
         for (uint32_t i = 0; i < b->data_length; ++i) {
             fprintf(fp, "%02X", b->data[i]);
             if ((i + 1) % 16 == 0) fprintf(fp, "\n"); // Align next row
             else if (i < b->data_length - 1) fprintf(fp, " ");
         }
-        fprintf(fp, "\n");
-
+        fprintf(fp,"\n");
         fclose(fp);
     }
 }
@@ -110,7 +109,7 @@ void cleanup(int server_sock) {
 int initSocket() {
     int server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if (server_sock < 0) {
-        syslog(LOG_ERR, "[-] Server socket creation failed!\n");
+        syslog(LOG_ERR, "[-]initSocket() Server socket creation failed!\n");
         exit(EXIT_FAILURE);
     }
     syslog(LOG_NOTICE, "[+] socket() done");
@@ -134,7 +133,7 @@ void bindListen(int server_sock, struct sockaddr_un *server_address) {
     unlink(SOCKET_PATH); // Remove any old socket file
 
     if (bind(server_sock, (struct sockaddr *)server_address, sizeof(struct sockaddr_un)) == -1) {
-        syslog(LOG_ERR, "[-] Bind() error\n");
+        syslog(LOG_ERR, "[-]bindListen() Bind() error\n");
         close(server_sock);
         exit(EXIT_FAILURE);
     }
