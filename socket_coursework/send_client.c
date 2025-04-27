@@ -5,14 +5,14 @@
 
 
 int main(){
-    char *id = "this id ID franek";
+    char *id = "test id 1008";
     uint8_t secret[16] = {
         0xFF, 0x02, 0x33, 0x04,
         0x55, 0x06, 0x07, 0x08,
         0x09, 0x0A, 0x0B, 0x0C,
         0x0D, 0x0E, 0x0F, 0x10
     };
-    char *message = "long message testing testing!!";
+    char *message = "this is a message";
     uint32_t data_length = strlen(message);
 
     uint8_t result = sendNewBlock(id,secret,data_length,message);
