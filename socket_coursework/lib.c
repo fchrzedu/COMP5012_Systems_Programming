@@ -105,7 +105,7 @@ uint8_t receiveResponse(int fd){
 }
 bool receiveDataLength(int fd, uint32_t *d_len){
     if(recv(fd, d_len, sizeof(*d_len),0) != sizeof(*d_len)){
-        syslog(LOG_ERR,"[-]receiveDataLength() failed to receive data_lengt\n");
+        syslog(LOG_ERR,"[-]receiveDataLength() failed to receive data_length\n");
         return false;
     }
     return true;
@@ -158,6 +158,7 @@ uint8_t getBlock(char *ID, uint8_t *secret, uint32_t buffer_size, void *buffer){
     3. send ID
     4. send secret 
     5. await response
+    
     */
     logOpen();int sockfd = connectDaemon();  if(sockfd < 0){return FAIL;}
 
@@ -187,3 +188,68 @@ uint8_t getBlock(char *ID, uint8_t *secret, uint32_t buffer_size, void *buffer){
     return SUCCESS;
 
 }
+bool sendBeginText(int fd, uint32_t offset){
+    if(!sendBufferForPartial(fd, &offset, sizeof(offset),0)){
+        syslog(LOG_ERR,"[-]sendBeginText() failed to sent positioning offset\n");
+        return false;
+    }
+    return true;
+}
+
+bool sendBufferForPartial(int fd, void *buff, size_t len){
+    size_t total_sent = 0;ssize_t sent = 0;
+    while(total_sent < len){
+        sent = send(fd,buff + total_sent, len - total_sent, 0);
+        if(sent == -1){
+            syslog(LOG_ERR,"[-]sendBufferForPartial failed to send buffer data\n");
+            return false;
+        }
+        total_sent += sent;
+    }
+    return true;
+}
+bool sendLenText(int fd, uint32_t req_len){
+    if(!sendBufferForPartial(fd, &req_len, sizeof(req_len), 0)){
+        syslog(LOG_ERR,"[-]sendLenText() failed to send requested length of partial read\n");
+        return false;
+    }
+    return true;
+}
+uint8_t partRead(char *ID, uint8_t *secret, uint8_t **bufferAccess, uint32_t begin_text, uint32_t length_text){
+    /*
+    1. Get ID and secret of block to partially read 
+    2. Get starting position of text, and the length we want it to end at
+    3. Pass in buffer as double pointer
+
+    3.a. Pass in buffer address
+    3.b. we malloc buffer - allocate it memory dynamically
+    3.c. we then store it back in *buffer
+    3.d. allows us to directly modify buffer inside func instead of reallocating oustside as a return val
+    */
+    int partialfd = connectDaemon();if(partialfd < 0){return FAIL;}
+    if(!sendOpCode(partialfd, (uint8_t)GET)){return handleErr(partialfd);}
+    if(!sendIDandLength(partialfd, ID, 1)){return handleErr(partialfd);}
+    if(!sendIDandLength(partialfd, ID, 2)){return handleErr(partialfd);}
+    if(!sendSecret(partialfd, secret)){return handleErr(partialfd);}
+    if(!sendBeginText(partialfd, begin_text)){return handleErr(partialfd);}
+    if(!sendLenText(fd, len_text)){return handleErr(partialfd);}
+    uint8_t read_response = 0;
+    if(recv(partialfd, &read_response, sizeof(read_response),0 ) != sizeof(read_response)){
+        syslog(LOG_ERR,"[-]partRead() failed to receive response\n");
+        return handleErr(partial fd);
+    }
+    uint32_t recv_length = 0;
+    if(!receiveDatalength(partialfd, &recv_length)){return handleErr(fd);}
+    *bufferAccess = malloc(recv_length);
+    if((*bufferAccess) == 0){
+        syslog(LOG_ERR,"[-]partRead malloc for **buffer failed\n");
+        close(partialfd);return FAIL;
+    }
+    if(!receiveActualData(partialfd, *bufferAccess, recv_length)){
+        free(*bufferAccess);return handleErr(partialfd);
+    }
+
+
+
+}
+
