@@ -15,6 +15,7 @@
 
 #define SEND 0
 #define GET 1
+#define PARTIAL_GET 2
 
 #define SUCCESS 0
 #define FAIL 1
@@ -307,6 +308,79 @@ uint8_t handleGetBlock(int client_sock){
     
 
 }
+uint8_t handlePartialGetBlock(int client_sock){
+    uint8_t id_len = 0;
+    char idbuff[256] = {0}; 
+    uint8_t secret[16] = {0};
+    uint32_t begin_text_offset = 0;
+    uint32_t len_text = 0;
+    // receive ID and length
+    if(!receiveAll(client_sock, &id_len, sizeof(id_len))){
+        syslog(LOG_ERR, "[-]handlePartialGetBlock() failed to receive ID length\n");
+        return respond(client_sock, FAIL);
+    }
+    if(!receiveAll(client_sock, idbuff, id_len)){
+        syslog(LOG_ERR,"[-]handlePartialGetBlock() failed to receive ID tag\n");
+        return respond(client_sock, FAIL);
+    } 
+    // receive secret
+    if(!receiveAll(client_sock, secret, 16)){
+        syslog(LOG_ERR,"[-]handlePartialGetBlock() failed to receive secret\n");
+        return respond(client_sock, FAIL);
+    }
+    //receive offset and length
+    if(!receiveAll(client_sock, &begin_text_offset, sizeof(begin_text_offset))){
+        syslog(LOG_ERR,"[-]handlePartialGetBlock() failed to receive begin_text_offset\n");
+        return respond(client_sock, FAIL);
+    }
+    if(!receiveAll(client_sock, &len_text, sizeof(len_text))){
+        syslog(LOG_ERR,"[-]handlePartialGetBlock() failed to receive length needed for offset\n");
+        return respond(client_sock, FAIL);
+    }
+
+    // search for block using ID and secret
+    DataBlock *block = head;
+    while(block != NULL){
+        if(strncmp(block->ID, idbuff, sizeof(b->ID)) == 0){
+            if(memcmp(block->secret, secret, 16 != 0)){
+                syslog(LOG_ERR,"[-]handlePartialGetBlock() secrets not matching\n");
+                return respond(client_sock, ACCESS_DENIED);
+            }
+            // check whether offset and length are valid
+            if(begin_text_offset >= block->data_length){
+                syslog(LOG_ERR,"[-]handlePartialGetBlock() offset > block's dat length\n");
+                return respond(client_sock, FAIL);
+            }
+            //if length is greater, adjust it
+            if(begin_text_offset + len_text > block->data_length){
+                length = block->data_length - begin_text_offset;
+            }
+
+            // send success response
+            if(respond(client_sock, SUCCESS) != SUCCESS){
+                syslog(LOG_ERR,"[-]handlePartialGetBlock() failed to respond 'SUCCESS\n");
+                return FAIL;
+            }
+            //send data after adjusting its length
+            if(!sendAll(client_sock, &len_text, sizeof(len_text))){
+                syslog(LOG_ERR,"[-]handlePartialGetBlock() fail sending snipped length\n");
+                return FAIL;
+            }
+
+            if(!sendAll(client_sock, b->data + begin_text_offset, len_text)){
+                syslog(LOG_ERR,"[-]handlePartialGetBlock() failed sending snipped data\n");
+                return FAIL;
+            }
+            return SUCCESS;
+        }
+        block = block->next;
+    }
+    syslog(LOG_ERR,"[-]handlePartialGetBlock() ID:%s not found\n",ID);
+    return respond(client_sock, NOT_FOUND);   
+
+}
+
+
 /* ---------- CLIENT CONNECT() FROM LIB WORKS ----------*/
 void connectionHandling(int server_sock) {
     int client_sock;
@@ -321,7 +395,7 @@ void connectionHandling(int server_sock) {
         client_sock = accept(server_sock, (struct sockaddr *)&client_address, &client_len);
 
         if (client_sock < 0) {
-            syslog(LOG_ERR, "[-]Accept() error\n");
+            syslog(LOG_ERR, "[-]connectionHandling() Accept() error\n");
             close(client_sock);
             exit(EXIT_FAILURE);
         }
@@ -343,6 +417,8 @@ void connectionHandling(int server_sock) {
             case GET:
                 resp = handleGetBlock(client_sock);
                 break;
+            case PARTIAL_GET:
+                resp = handlePartialGetBlock(client_fd);
             default:
                 syslog(LOG_ERR,"[-] Unknown opcode received: %d",code);
                 send(client_sock, &(uint8_t){FAIL}, sizeof(uint8_t),0);
