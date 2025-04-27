@@ -13,7 +13,7 @@ int main(){
         0x09, 0x6B, 0x0B, 0x0C,
         0x0D, 0x0E, 0x0F, 0x10
     };
-    
+
     uint8_t *buffer = {0};  // buffer must be a pointer
     uint32_t offset = 5;
     uint32_t length = 11;
@@ -24,7 +24,15 @@ int main(){
         free(buffer);
     } else {
         printf("Failed to retrieve block. Error code: %d\n", result);
-    }
+    }/*
+    uint8_t buffer[256] = {0};
+    uint8_t result = getBlock(id,secret,sizeof(buffer),buffer);
+    if (result == SUCCESS) {
+        printf("Data retrieved from daemon: %5s \n", buffer);
+    } else {
+        printf("Failed to retrieve block. Error code: %d\n", result);
+    }*/
+
 
     return 0;
 }
@@ -37,13 +45,7 @@ char *id = "HELLO HOW ARE YOU GUYS!";
         0x0D, 0x0E, 0x0F, 0x10
     };
 
-    uint8_t buffer[256] = {0};
-    uint8_t result = getBlock(id,secret,sizeof(buffer),buffer);
-    if (result == SUCCESS) {
-        printf("Data retrieved from daemon: %5s \n", buffer);
-    } else {
-        printf("Failed to retrieve block. Error code: %d\n", result);
-    }
+    
 
     return 0;
 */

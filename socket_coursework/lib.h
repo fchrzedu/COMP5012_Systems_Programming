@@ -9,6 +9,7 @@
 /* ----- SHARED LIB SEND OP CODES ----- */
 #define SEND 0
 #define GET 1
+#define PARTIAL_GET 2
 
 /* ----- DAEMON RESPONSE OP CODES ----- */
 #define SUCCESS 0
@@ -32,6 +33,7 @@ bool sendDataLength(int fd, uint32_t d_len);
 bool sendActualData(int fd, void *d, uint32_t d_len);
 uint8_t receiveResponse(int fd);
 
+uint8_t partialGetBlock(char *ID, uint8_t *secret, void **bufferAccess, uint32_t *begin_text, uint32_t length_text);
 uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data); // Sends a new block
 uint8_t getBlock(char *ID, uint8_t *secret, uint32_t buffer_size, void *buffer); // Retreives block from daemon - prints to client
 

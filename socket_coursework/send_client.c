@@ -12,7 +12,7 @@ int main(){
         0x09, 0x6B, 0x0B, 0x0C,
         0x0D, 0x0E, 0x0F, 0x10
     };
-    char *message = "this && is [- a ] test message";
+    char *message = "8348232 R6B br^*r^b*( 6RB)";
     uint32_t data_length = strlen(message);
 
     uint8_t result = sendNewBlock(id,secret,data_length,message);
