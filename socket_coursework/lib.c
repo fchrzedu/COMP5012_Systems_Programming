@@ -58,9 +58,9 @@ bool sendIDAndLength(int fd, char*ID, int flag){
         }
     }
     else if (flag == 2){
-        char idsend[256] = {0};
-        strncpy(idsend, ID, sizeof(idsend) - 1);
-        if(send(fd, idsend, sizeof(idsend),0) != sizeof(idsend)){
+        uint8_t id_l = strlen(ID);
+        
+        if(send(fd, ID, id_l,0) != id_l){
             syslog(LOG_ERR,"[-]sendIDAndLength() failed to send ID\n");
             return false;
         }

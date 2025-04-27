@@ -178,10 +178,11 @@ uint8_t handleSendBlock(int client_sock){
     /* - received ID -*/
     char idbuffer[256] = {0};
 
-    if(!receiveAll(client_sock, idbuffer, sizeof(idbuffer))){
+    if(!receiveAll(client_sock, idbuffer, id_len)){
         syslog(LOG_ERR,"[-]handleSendBlock() failed to receive ID\n");
         return respond(client_sock,FAIL);
     }
+    idbuffer[id_len] = '\0';
 
     /* - check duplicate ID -*/
     DataBlock *currentptr = head;
@@ -264,10 +265,11 @@ uint8_t handleGetBlock(int client_sock){
         
     /* -- recv id -- */
     char idbuffer[256] = {0};
-    if(!receiveAll(client_sock, idbuffer, sizeof(idbuffer))){
+    if(!receiveAll(client_sock, idbuffer, id_len)){
         syslog(LOG_ERR,"[-]handleGetBlock() failed to receive ID\n");
         return respond(client_sock,FAIL);
     }
+    idbuffer[id_len] = '\0';
       
     /* -- receive secret -- */
     uint8_t secret[16] = {0};
