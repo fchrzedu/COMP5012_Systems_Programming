@@ -182,7 +182,7 @@ uint8_t getBlock(char *ID, uint8_t *secret, uint32_t buffer_size, void *buffer){
         return handleErr(sockfd);
     }
     
-    if(!receiveActualData(sockfd,buffer,sizeof(buffer))){return handleErr(sockfd);}
+    if(!receiveActualData(sockfd,buffer,data_length)){return handleErr(sockfd);}
     close(sockfd);
     return SUCCESS;
 
