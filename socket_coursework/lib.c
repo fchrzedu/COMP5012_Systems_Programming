@@ -187,20 +187,3 @@ uint8_t getBlock(char *ID, uint8_t *secret, uint32_t buffer_size, void *buffer){
     return SUCCESS;
 
 }
-
-
-
-/* -- testing code here for receiving data from the daemon --- */
-/*
-    uint32_t totalrecvd = 0;
-    uint8_t *dptr = (uint8_t*)buffer;
-    while(totalrecvd < data_length){
-        ssize_t recvd = recv(sockfd, dptr + totalrecvd, data_length - totalrecvd, 0);
-        if(recvd < 1){
-            syslog(LOG_ERR,"[-]getBlock() failed to receive all data\n");
-            return handleErr(sockfd);
-        }
-        totalrecvd += recvd;
-    }*/
-
-
