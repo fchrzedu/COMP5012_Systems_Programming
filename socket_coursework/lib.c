@@ -122,6 +122,40 @@ bool receiveActualData(int fd, void *b, uint32_t check_len){
     }
     return true;
 }
+bool sendBeginText(int fd, uint32_t begin_text){
+    if(send(fd, &begin_text, sizeof(begin_text), 0) != sizeof(begin_text)){
+        syslog(LOG_ERR,"[-]sendBeginText() failed to send offset for partial get\n");
+        return false;
+    }
+    return true;
+}
+bool sendLengthText(int fd, uint32_t length_text){
+    if(send(fd, &length_text, sizeof(length_text),0) != sizeof(length_text)){
+        syslog(LOG_ERR,"[-]sendLengthText() failed to send length needed for offset\n");
+        return false;
+    }return true;
+}
+bool receivePartData(int fd, void *buff, uint32_t len){
+    uint32_t total_read = 0;
+    uint32_t data_len = 0;
+    if(recv(fd, &data_len, sizeof(data_len),0) != sizeof(data_len)){
+        syslog(LOG_ERR,"[-]receivePartData() failed to receive snippet length\n");
+        return false;
+    }
+    if(data_len != len){
+        syslog(LOG_ERR,"[-]Received snippet length %u does not match expected length %u\n", data_len, len);
+        return false;
+    }
+    while(total_read < len){
+        ssize_t recvD = recv(fd, buff + total_read, len - total_read, 0);
+        if(recvD < 1){
+            syslog(LOG_ERR,"[-]receivePartData() failed to receive partial data\n");
+            return false;
+        }
+        total_read +=recvD;
+    }
+    return true;
+}
 
 uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data){
     /*
@@ -188,31 +222,8 @@ uint8_t getBlock(char *ID, uint8_t *secret, uint32_t buffer_size, void *buffer){
     return SUCCESS;
 
 }
+// removed *begin_text
 
-bool sendBeginText(int fd, uint32_t *begin_text){
-    if(send(fd, begin_text, sizeof(*begin_text), 0) != sizeof(*begin_text)){
-        syslog(LOG_ERR,"[-]sendBeginText() failed to send offset for partial get\n");
-        return false;
-    }
-    return true;
-}
-bool sendLengthText(int fd, uint32_t length_text){
-    if(send(fd, &length_text, sizeof(length_text),0) != sizeof(length_text)){
-        syslog(LOG_ERR,"[-]sendLengthText() failed to send length needed for offset\n");
-        return false;
-    }return true;
-}
-bool receivePartData(int fd, void *buff, uint32_t len){
-    uint32_t total_read = 0;
-    while(total_read < len){
-        ssize_t recvD = recv(fd, buff + total_read, len - total_read, 0);
-        if(recvD < 1){
-            syslog(LOG_ERR,"[-]receivePartData() failed to receive partial data\n");
-            return false;
-        }
-    }
-    return true;
-}
 uint8_t partialGetBlock(char *ID, uint8_t *secret, void **bufferAccess, uint32_t *begin_text, uint32_t length_text){
     /*
     1. Get ID and secret of block to partially read 
@@ -224,7 +235,6 @@ uint8_t partialGetBlock(char *ID, uint8_t *secret, void **bufferAccess, uint32_t
     3.c. we then store it back in *buffer
     3.d. allows us to directly modify buffer inside func instead of reallocating oustside as a return val
     */
-
     logOpen();
     int partfd = connectDaemon();if (partfd < 1){return FAIL;} // send op code
     if(!sendOpCode(partfd, (uint8_t)PARTIAL_GET)){return handleErr(partfd);}
@@ -234,31 +244,29 @@ uint8_t partialGetBlock(char *ID, uint8_t *secret, void **bufferAccess, uint32_t
     // send secret
     if(!sendSecret(partfd, secret)){return handleErr(partfd);}
     // send where to start in the message
-    if(!sendBeginText(partfd, begin_text)){return handleErr(partfd);}
+    if(!sendBeginText(partfd, *begin_text)){return handleErr(partfd);}
     // send length from offset
     if(!sendLengthText(partfd, length_text)){return handleErr(partfd);}
 
     // await daemon response
     uint8_t resp = receiveResponse(partfd);
     if(resp != SUCCESS){
-        syslog(LOG_ERR."[-]partialGetBlock() failed on receiveResponse() error\n");
+        syslog(LOG_ERR,"[-]partialGetBlock() failed on receiveResponse() error\n");
         close(partfd);return resp;
     }
-
     // allocate memory for buffer (double ** to access directly)
-    if((*bufferAccess = malloc(length_text)) == 0){
+    if((*bufferAccess = malloc(length_text + 1)) == 0){
         syslog(LOG_ERR,"[-]partialGetBlock() **buffer == 0\n");
         close(partfd);return handleErr(partfd);
     }
-
+    memset(*bufferAccess,0,length_text + 1);
     // receive partial data from daemon
     if(!receivePartData(partfd, *bufferAccess, length_text)){
         free(*bufferAccess);return handleErr(partfd);
-        return handleErr(partfd);
-    }
-    
-    close(partfd); return SUCCESS;
-    
+    }    
+    ((char *)*bufferAccess)[length_text] = '\0';
+
+    close(partfd); return SUCCESS;   
 
 }
 
