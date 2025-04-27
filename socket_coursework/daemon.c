@@ -287,7 +287,10 @@ uint8_t handleGetBlock(int client_sock){
                 syslog(LOG_ERR,"[-]handleGetBlock() secret mistmatch for ID: %s\n",idbuffer);
                 return respond(client_sock, ACCESS_DENIED);
             }
-            respond(client_sock,SUCCESS);
+            if(respond(client_sock,SUCCESS) != SUCCESS){
+                syslog(LOG_ERR,"[-]handleGetBlock() failed to send SUCCESS OPCODE");
+                return FAIL;
+            }
 
             /* -- send data length -- */
             if(!sendAll(client_sock, &b->data_length,sizeof(b->data_length))){
@@ -341,8 +344,8 @@ uint8_t handlePartialGetBlock(int client_sock){
     // search for block using ID and secret
     DataBlock *block = head;
     while(block != NULL){
-        if(strncmp(block->ID, idbuff, sizeof(b->ID)) == 0){
-            if(memcmp(block->secret, secret, 16 != 0)){
+        if(strncmp(block->ID, idbuff, sizeof(block->ID)) == 0){
+            if(memcmp(block->secret, secret, 16) != 0){
                 syslog(LOG_ERR,"[-]handlePartialGetBlock() secrets not matching\n");
                 return respond(client_sock, ACCESS_DENIED);
             }
@@ -353,7 +356,7 @@ uint8_t handlePartialGetBlock(int client_sock){
             }
             //if length is greater, adjust it
             if(begin_text_offset + len_text > block->data_length){
-                length = block->data_length - begin_text_offset;
+                len_text = block->data_length - begin_text_offset;
             }
 
             // send success response
@@ -367,7 +370,7 @@ uint8_t handlePartialGetBlock(int client_sock){
                 return FAIL;
             }
 
-            if(!sendAll(client_sock, b->data + begin_text_offset, len_text)){
+            if(!sendAll(client_sock, block->data + begin_text_offset, len_text)){
                 syslog(LOG_ERR,"[-]handlePartialGetBlock() failed sending snipped data\n");
                 return FAIL;
             }
@@ -375,7 +378,7 @@ uint8_t handlePartialGetBlock(int client_sock){
         }
         block = block->next;
     }
-    syslog(LOG_ERR,"[-]handlePartialGetBlock() ID:%s not found\n",ID);
+    syslog(LOG_ERR,"[-]handlePartialGetBlock() ID:%s not found\n",idbuff);
     return respond(client_sock, NOT_FOUND);   
 
 }
@@ -409,7 +412,7 @@ void connectionHandling(int server_sock) {
             //exit(EXIT_FAILURE); // change ?? -----------------
 
         }
-
+        syslog(LOG_NOTICE,"[!] received opcode:%d",code);
         switch(code){
             case SEND:
                 resp = handleSendBlock(client_sock);
@@ -418,7 +421,8 @@ void connectionHandling(int server_sock) {
                 resp = handleGetBlock(client_sock);
                 break;
             case PARTIAL_GET:
-                resp = handlePartialGetBlock(client_fd);
+                resp = handlePartialGetBlock(client_sock);
+                break;
             default:
                 syslog(LOG_ERR,"[-] Unknown opcode received: %d",code);
                 send(client_sock, &(uint8_t){FAIL}, sizeof(uint8_t),0);
