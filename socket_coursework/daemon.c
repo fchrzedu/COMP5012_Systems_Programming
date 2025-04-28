@@ -10,12 +10,12 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <stdbool.h>
-#include <time.h>
-
+/* operation codes */
 #define SEND 0
 #define GET 1
 #define PARTIAL_GET 2
 #define UPDATE 3
+/* response codes */
 #define SUCCESS 0
 #define CLOSE 5
 #define FAIL 1
@@ -26,7 +26,7 @@
 #define SOCKET_PATH "/tmp/domainsocket"
 #define MAX_STORAGE 50  // Max number of blocks to store
 
-/* ----- PERMISSION AND SECRETS -----*/
+/* ----- PERMISSION AND SECRETS (un-implemented) -----*/
 typedef struct Permission{
     uint8_t secret[16];
     int perm;
@@ -47,8 +47,6 @@ typedef struct DataBlock{
 
 DataBlock *head = NULL;
 static DataBlock storage[MAX_STORAGE];
-
-// DEBUGGIN HERE !!
 
 
 
@@ -74,7 +72,7 @@ int initSocket() {
 /* ---------- DAEMONIZES ----------*/
 void daemonize() {
     pid_t pid, sid;
-
+    /* forks current session, deattaches itself from terminal & std(in/out)*/
     pid = fork();
     if (pid < 0) {
         syslog(LOG_ERR, "[-] Forking error");
@@ -92,23 +90,23 @@ void daemonize() {
 
     if (chdir("/") < 0) {
         syslog(LOG_ERR, "[-] chdir error");
-        exit(EXIT_FAILURE);
-    }
+        exit(EXIT_FAILURE);    }
 
     umask(0);
     close(STDIN_FILENO);
     close(STDOUT_FILENO);
     close(STDERR_FILENO);
-
     syslog(LOG_NOTICE, "[+] Daemon initialized and detached");
 }
 void pathLogSetup(char *buff, size_t buff_size) {
-    memset(buff, 0, buff_size); // Fill buffer with 0s
-    strncpy(buff, SOCKET_PATH, buff_size - 1); // Copy the path
-    syslog(LOG_NOTICE, "testbuf = %s", buff);
+    /* copies socket path to the daemon */
+    memset(buff, 0, buff_size);
+    strncpy(buff, SOCKET_PATH, buff_size - 1); 
 }
 /* ---------- SERVER ADDRESS SETUP ----------*/
 void serverSetup(struct sockaddr_un *server_address) {
+    /* clears server structure (pre-caution), sets it to UNIX socket family
+    Copies the server sun path address */
     memset(server_address, 0, sizeof(struct sockaddr_un)); // Clear struct
     (*server_address).sun_family = AF_UNIX; // Set socket family
     strncpy((*server_address).sun_path, SOCKET_PATH, sizeof((*server_address).sun_path) - 1); // Copy path
@@ -116,15 +114,15 @@ void serverSetup(struct sockaddr_un *server_address) {
 }
 /* ---------- BIND() & LISTEN() ----------*/
 void bindListen(int server_sock, struct sockaddr_un *server_address) {
-    unlink(SOCKET_PATH); // Remove any old socket file
-
+    /* removes any existing socket /tmp files - proceeds to bind to server and listens for maximum 10 clients */
+    unlink(SOCKET_PATH); 
     if (bind(server_sock, (struct sockaddr *)server_address, sizeof(struct sockaddr_un)) == -1) {
         syslog(LOG_ERR, "[-]bindListen() Bind() error\n");
         close(server_sock);
         exit(EXIT_FAILURE);
     }
     syslog(LOG_NOTICE, "[+] Bind() success\n");
-    listen(server_sock, 10); // Start listening - at the moment 2 clients
+    listen(server_sock, 10); s
 }
 
 uint8_t respond(int fd, uint8_t r){
@@ -152,18 +150,43 @@ bool sendAll(int sfd, const void *b, size_t len){
     }
     return true;
 }
+bool isValid(const char *id, uint8_t id_len, const uint8_t *sec, uint32_t data_len,const uint8_t *data ){
+    /* check whether ID & it's length are within bounds. Same for secret, data and data length*/
+    if(id_len < 0 || id_len > 255 ){
+        syslog(LOG_ERR,"[-]isValid(): ID length is invalid (length of %u)",id_len);
+        return false;
+    }
+    for(uint8_t = 0; i<id_len;i++){
+        /* checks whether any of ID is null terminates EXCEPT the actual last index which is \0 */
+        if(id[i] == '\0'){
+            syslog(LOG_ERR,"[-]isValid(): ID contains zero null byte at position: %u, i");
+            return false;
+        }
+    }
+    if(secret == NULL){
+        syslog(LOG_ERR,"[-]isValid(): no hexadecimal values stored in secret\n");
+        return false;
+    }
+    if(data_len == 0){
+        syslog(LOG_ERR,"[-]isValid(): data length is invalid of size: %u",data_len);
+        return false;
+    }
+    if(data == NULL){
+        syslog(LOG_ERR,"[-]isValid(): data is empty (NULL");
+        return false;
+    }
+    return true;
+
+}
 uint8_t handleSendBlock(int client_sock){
-    
-    uint8_t id_len = 0;
     /* -- receive ID length -- */
+    uint8_t id_len = 0;    
     if(!receiveAll(client_sock, &id_len, sizeof(id_len))){
         syslog(LOG_ERR,"[-]handleSendBlock() failed to receive id length\n");
         return respond(client_sock, FAIL);
     }    
-
     /* - received ID -*/
     char idbuffer[256] = {0};
-
     if(!receiveAll(client_sock, idbuffer, id_len)){
         syslog(LOG_ERR,"[-]handleSendBlock() failed to receive ID\n");
         return respond(client_sock,FAIL);
@@ -206,7 +229,7 @@ uint8_t handleSendBlock(int client_sock){
         free(data);
         return respond(client_sock,FAIL);
     }
-    
+    if(!isValidInput(idbuffer, id_len, secret, data_length, data)){free(data);return respond(client_sock, FAIL);}
     /* - allocate linked pointer storage block -*/
     DataBlock *b = NULL;
     bool isused = false;
@@ -385,6 +408,7 @@ uint8_t handleOverwriteBlock(int client_sock){
         syslog(LOG_ERR, "[-]handleOverwriteBlock() failed to receive new data length\n");
         return respond(client_sock, FAIL);
     }
+    
     uint8_t *n_data = malloc(n_data_len);
     if(!n_data){
         syslog(LOG_ERR, "[-]handleOverwriteBlock() failed to malloc mem for data\n");
@@ -392,6 +416,11 @@ uint8_t handleOverwriteBlock(int client_sock){
     }
     if (!receiveAll(client_sock, n_data, n_data_len)) {
         syslog(LOG_ERR, "[-]handleOverwriteBlock() failed to receive new data \n");
+        return respond(client_sock, FAIL);
+    }
+    // Validate inputs
+    if (!isValidInput(idbuffer, id_len, secret, n_data_len, n_data)) {
+        free(n_data);
         return respond(client_sock, FAIL);
     }
 
@@ -420,13 +449,16 @@ uint8_t handleOverwriteBlock(int client_sock){
 
 /* ---------- CLIENT CONNECT() FROM LIB WORKS ----------*/
 void connectionHandling(int server_sock) {
+    /* client socket side setup variables */
     int client_sock;
     struct sockaddr_un client_address;
     socklen_t client_len;
-    uint8_t code; /* OPCODE */
-    uint8_t resp; /* STORED RESPONSE FLAG*/
-
+    /* creates variable for daemon response, and lib.c retrieved operation needed */
+    uint8_t code; 
+    uint8_t resp; 
+    /* while(1) - not neccesarily the best while loop, but it stays infinite */
     while (1) {
+        /* give client a server and accept the socket connection under client_sock */
         client_len = sizeof(client_address);
         client_sock = accept(server_sock, (struct sockaddr *)&client_address, &client_len);
 
@@ -435,17 +467,18 @@ void connectionHandling(int server_sock) {
             close(client_sock);
             continue; /* needed to keep the daemon listening to other sequential clients */
         }
-        syslog(LOG_NOTICE, "[+]Accept() success\n");
+        syslog(LOG_NOTICE, "[+]connectionHandling() Accept() success\n");
 
         /* READ OPCODE FROM SHARELIB */
         if(recv(client_sock, &code, sizeof(code), 0) != sizeof(code)){
             syslog(LOG_ERR,"[-] failed to read opcode from sharelib\n");
             close(client_sock);
-            continue;
+            continue; 
+            /* don't want to close client incase they may send additional opcodes */
             
-
         }
-        syslog(LOG_ERR,"[!] received opcode:%d",code);
+        /* switch case to handle lib.c operations needed */
+        syslog(LOG_NOTICE,"[!] received opcode:%d",code);
         switch(code){
             case SEND:
                 resp = handleSendBlock(client_sock);
