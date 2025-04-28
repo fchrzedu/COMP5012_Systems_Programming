@@ -158,31 +158,41 @@ bool receivePartData(int fd, void *buff, uint32_t len){
 }
 
 uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data){
-    /*
-    1. send op code YES
-    2. send ID YES
-    3. send secret
-    4. send data length
-    5. send data
-    */
-    logOpen();int sockfd = connectDaemon();if(sockfd < 0){return FAIL;}   
+    logOpen();
+    int sockfd = connectDaemon();
+    if(sockfd < 0){
+        return FAIL;
+    }   
     /* -- send flag 'SEND' -- */
-    if(!sendOpCode(sockfd, (uint8_t)SEND)){ return handleErr(sockfd);}
+    if(!sendOpCode(sockfd, (uint8_t)SEND)){
+        return handleErr(sockfd);
+    }
     /* - send ID length followed by ID - */
-    if(!sendIDAndLength(sockfd, ID, 1)){return handleErr(sockfd);}
-    if(!sendIDAndLength(sockfd, ID, 2)){return handleErr(sockfd);}
+    if(!sendIDAndLength(sockfd, ID, 1)){
+        return handleErr(sockfd);
+    }
+    if(!sendIDAndLength(sockfd, ID, 2)){
+        return handleErr(sockfd);
+    }
 
     /* - send secret - */
-    if(!sendSecret(sockfd, secret)){return handleErr(sockfd);}
+    if(!sendSecret(sockfd, secret)){
+        return handleErr(sockfd);
+    }
     
     /* - send data_length - */
-    if(!sendDataLength(sockfd, data_length)){return handleErr(sockfd);}
-    if(!sendActualData(sockfd, data, data_length)){return handleErr(sockfd);}  
+    if(!sendDataLength(sockfd, data_length)){
+        return handleErr(sockfd);
+    }
+    if(!sendActualData(sockfd, data, data_length)){
+        return handleErr(sockfd);
+    }  
 
     uint8_t response = receiveResponse(sockfd);   
     if(response == ALREADY_EXISTS){
-        syslog(LOG_NOTICE,"[!]calling overwriteBlock() on ID: %s", ID);
-        return overwriteBlock(ID, secret, data_length, data);
+        syslog(LOG_NOTICE,"[!] Block with ID '%s' already exists.", ID);
+        close(sockfd);
+        return ALREADY_EXISTS;
     } 
     close(sockfd);
     return response;

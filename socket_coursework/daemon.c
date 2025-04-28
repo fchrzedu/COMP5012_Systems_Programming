@@ -122,7 +122,7 @@ void bindListen(int server_sock, struct sockaddr_un *server_address) {
         exit(EXIT_FAILURE);
     }
     syslog(LOG_NOTICE, "[+] Bind() success\n");
-    listen(server_sock, 10); s
+    listen(server_sock, 10); 
 }
 
 uint8_t respond(int fd, uint8_t r){
@@ -156,14 +156,14 @@ bool isValid(const char *id, uint8_t id_len, const uint8_t *sec, uint32_t data_l
         syslog(LOG_ERR,"[-]isValid(): ID length is invalid (length of %u)",id_len);
         return false;
     }
-    for(uint8_t = 0; i<id_len;i++){
+    for(uint8_t i = 0; i<id_len;i++){
         /* checks whether any of ID is null terminates EXCEPT the actual last index which is \0 */
         if(id[i] == '\0'){
-            syslog(LOG_ERR,"[-]isValid(): ID contains zero null byte at position: %u, i");
+            syslog(LOG_ERR,"[-]isValid(): ID contains zero null byte at position: %u", i);
             return false;
         }
     }
-    if(secret == NULL){
+    if(sec == NULL){
         syslog(LOG_ERR,"[-]isValid(): no hexadecimal values stored in secret\n");
         return false;
     }
@@ -179,26 +179,36 @@ bool isValid(const char *id, uint8_t id_len, const uint8_t *sec, uint32_t data_l
 
 }
 uint8_t handleSendBlock(int client_sock){
-    /* -- receive ID length -- */
+   /* get ID and it's length */
     uint8_t id_len = 0;    
     if(!receiveAll(client_sock, &id_len, sizeof(id_len))){
         syslog(LOG_ERR,"[-]handleSendBlock() failed to receive id length\n");
         return respond(client_sock, FAIL);
-    }    
-    /* - received ID -*/
+    }        
     char idbuffer[256] = {0};
     if(!receiveAll(client_sock, idbuffer, id_len)){
         syslog(LOG_ERR,"[-]handleSendBlock() failed to receive ID\n");
         return respond(client_sock,FAIL);
     }
-    idbuffer[id_len] = '\0';
+    idbuffer[id_len] = '\0'; // end of string
 
-    /* - check duplicate ID -*/
+    /* check dupplicate ID*/
     DataBlock *currentptr = head;
     while(currentptr != NULL){
         if (strncmp(currentptr->ID, idbuffer, sizeof(currentptr->ID)) == 0) {
-            syslog(LOG_ERR,"[-]handleSendBlock() duplicate ID\n");
-            return respond(client_sock,FAIL);
+            uint8_t secret[16] = {0};
+            if(!receiveAll(client_sock, secret, 16)){
+                syslog(LOG_ERR,"[-]handleSendBlock() failed to receive secret\n");
+                return respond(client_sock,FAIL);
+            }
+            if(memcmp(currentptr->secret, secret, 16) == 0){
+                syslog(LOG_NOTICE,"[!]handleSendBlock() duplicate ID & secret - please overwrite \n");
+                return respond(client_sock, ALREADY_EXISTS);
+            }
+            else{
+                syslog(LOG_ERR,"[!]handleSendBlock() matching ID, mismatching secret\n");
+                return respond(client_sock, ACCESS_DENIED);
+            }           
         }
         currentptr = currentptr->next;
 
@@ -229,7 +239,7 @@ uint8_t handleSendBlock(int client_sock){
         free(data);
         return respond(client_sock,FAIL);
     }
-    if(!isValidInput(idbuffer, id_len, secret, data_length, data)){free(data);return respond(client_sock, FAIL);}
+    if(!isValid(idbuffer, id_len, secret, data_length, data)){free(data);return respond(client_sock, FAIL);}
     /* - allocate linked pointer storage block -*/
     DataBlock *b = NULL;
     bool isused = false;
@@ -419,7 +429,7 @@ uint8_t handleOverwriteBlock(int client_sock){
         return respond(client_sock, FAIL);
     }
     // Validate inputs
-    if (!isValidInput(idbuffer, id_len, secret, n_data_len, n_data)) {
+    if (!isValid(idbuffer, id_len, secret, n_data_len, n_data)) {
         free(n_data);
         return respond(client_sock, FAIL);
     }
