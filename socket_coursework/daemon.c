@@ -12,11 +12,10 @@
 #include <stdbool.h>
 #include <time.h>
 
-
 #define SEND 0
 #define GET 1
 #define PARTIAL_GET 2
-
+#define UPDATE 3
 #define SUCCESS 0
 #define FAIL 1
 #define ACCESS_DENIED 2
@@ -116,7 +115,37 @@ int initSocket() {
     syslog(LOG_NOTICE, "[+] socket() done");
     return server_sock;
 }
+/* ---------- DAEMONIZES ----------*/
+void daemonize() {
+    pid_t pid, sid;
 
+    pid = fork();
+    if (pid < 0) {
+        syslog(LOG_ERR, "[-] Forking error");
+        exit(EXIT_FAILURE);
+    }
+    if (pid > 0) {
+        exit(EXIT_SUCCESS); // Parent exits
+    }
+
+    sid = setsid();
+    if (sid < 0) {
+        syslog(LOG_ERR, "[-] setsid error");
+        exit(EXIT_FAILURE);
+    }
+
+    if (chdir("/") < 0) {
+        syslog(LOG_ERR, "[-] chdir error");
+        exit(EXIT_FAILURE);
+    }
+
+    umask(0);
+    close(STDIN_FILENO);
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
+
+    syslog(LOG_NOTICE, "[+] Daemon initialized and detached");
+}
 void pathLogSetup(char *buff, size_t buff_size) {
     memset(buff, 0, buff_size); // Fill buffer with 0s
     strncpy(buff, SOCKET_PATH, buff_size - 1); // Copy the path
@@ -253,32 +282,26 @@ uint8_t handleSendBlock(int client_sock){
 
 }
 
-uint8_t handleGetBlock(int client_sock){
-    
+uint8_t handleGetBlock(int client_sock){ 
 
     uint8_t id_len = 0;
     if(!receiveAll(client_sock, &id_len, sizeof(id_len))){
         syslog(LOG_ERR,"[-]handleGetBlock() failed to receive ID length\n");
         return respond(client_sock, FAIL);
-    }
-    
-    
-        
+    }        
     /* -- recv id -- */
     char idbuffer[256] = {0};
     if(!receiveAll(client_sock, idbuffer, id_len)){
         syslog(LOG_ERR,"[-]handleGetBlock() failed to receive ID\n");
         return respond(client_sock,FAIL);
     }
-    idbuffer[id_len] = '\0';
-      
+    idbuffer[id_len] = '\0';      
     /* -- receive secret -- */
     uint8_t secret[16] = {0};
     if(!receiveAll(client_sock, secret, 16)){
         syslog(LOG_ERR,"[-]handleGetBlock() failed to receive secret\n");
         return respond(client_sock,FAIL);
     }
-    
     /* --  compare ID and secret -- */
     DataBlock *b = head;
     while(b!=NULL){
@@ -351,7 +374,7 @@ uint8_t handlePartialGetBlock(int client_sock){
             }
             // check whether offset and length are valid
             if(begin_text_offset >= block->data_length){
-                syslog(LOG_ERR,"[-]handlePartialGetBlock() offset > block's dat length\n");
+                syslog(LOG_ERR,"[-]handlePartialGetBlock() offset > block's data length\n");
                 return respond(client_sock, FAIL);
             }
             //if length is greater, adjust it
@@ -382,7 +405,64 @@ uint8_t handlePartialGetBlock(int client_sock){
     return respond(client_sock, NOT_FOUND);   
 
 }
+uint8_t handleOverwriteBlock(int client_sock){
+    uint8_t id_len = 0;
+    char idbuffer[256] = {0};
+    uint8_t secret[16] = {0};
+    uint32_t n_data_len = 0; /* different 'data' = different size*/
+    
+    if(!receiveAll(client_sock, &id_len, sizeof(id_len))){
+        syslog(LOG_ERR,"[-]handleOverwriteBlock() failed to receive ID length\n");
+        return respond(client_sock, FAIL);
+    }
 
+    if(!receiveAll(client_sock, idbuffer, id_len)){
+        syslog(LOG_ERR,"[-]handleOverwriteBlock() failed to receive ID\n");
+        return respond(client_sock, FAIL);
+    }
+
+    if(!receiveAll(client_sock, secret, 16)){
+        syslog(LOG_ERR,"[-]handleOverwriteBlock() failed to receive secret\n");
+        return respond(client_sock, FAIL);
+    }
+
+    if (!receiveAll(client_sock, &n_data_len, sizeof(n_data_len))) {
+        syslog(LOG_ERR, "[-]handleOverwriteBlock() failed to receive new data length\n");
+        return respond(client_sock, FAIL);
+    }
+    uint8_t *n_data = malloc(n_data_len);
+    if(!n_data){
+        syslog(LOG_ERR, "[-]handleOverwriteBlock() failed to malloc mem for data\n");
+        return respond(client_sock, FAIL);
+    }
+    if (!receiveAll(client_sock, n_data, n_data_len)) {
+        syslog(LOG_ERR, "[-]handleOverwriteBlock() failed to receive new data \n");
+        return respond(client_sock, FAIL);
+    }
+
+    DataBlock *block = head;
+    while(block != NULL){
+        if(strncmp(block->ID, idbuffer, sizeof(block->ID)) == 0){
+            if(memcmp(block->secret, secret, 16) != 0){
+                syslog(LOG_ERR,"[-]handleOverwriteBlock() different secrets (mismatch)\n");
+                free(n_data);
+                return respond(client_sock, ACCESS_DENIED);
+            }
+            free(block->data);
+            block->data = n_data;
+            block->data_length = n_data_len;
+            syslog(LOG_NOTICE,"[!]handleOverwriteBlock() overwrite for ID:%s",idbuffer);
+            logDebugData(block->ID, block->data_length);
+            free(n_data);
+            return respond(client_sock, SUCCESS);
+
+        }
+        block = block->next;
+    }
+    syslog(LOG_ERR, "[-]handleOverwriteBlock() no block exists for ID: %s\n", idbuffer);
+    
+    return respond(client_sock, NOT_FOUND);
+}
 
 /* ---------- CLIENT CONNECT() FROM LIB WORKS ----------*/
 void connectionHandling(int server_sock) {
@@ -412,7 +492,7 @@ void connectionHandling(int server_sock) {
             //exit(EXIT_FAILURE); // change ?? -----------------
 
         }
-        syslog(LOG_NOTICE,"[!] received opcode:%d",code);
+        syslog(LOG_ERR,"[!] received opcode:%d",code);
         switch(code){
             case SEND:
                 resp = handleSendBlock(client_sock);
@@ -422,6 +502,9 @@ void connectionHandling(int server_sock) {
                 break;
             case PARTIAL_GET:
                 resp = handlePartialGetBlock(client_sock);
+                break;
+            case UPDATE:
+                resp = handleOverwriteBlock(client_sock);
                 break;
             default:
                 syslog(LOG_ERR,"[-] Unknown opcode received: %d",code);
@@ -433,52 +516,19 @@ void connectionHandling(int server_sock) {
     }       
 }
 
-/* ---------- DAEMONIZES ----------*/
-void daemonize() {
-    pid_t pid, sid;
 
-    pid = fork();
-    if (pid < 0) {
-        syslog(LOG_ERR, "[-] Forking error");
-        exit(EXIT_FAILURE);
-    }
-    if (pid > 0) {
-        exit(EXIT_SUCCESS); // Parent exits
-    }
-
-    sid = setsid();
-    if (sid < 0) {
-        syslog(LOG_ERR, "[-] setsid error");
-        exit(EXIT_FAILURE);
-    }
-
-    if (chdir("/") < 0) {
-        syslog(LOG_ERR, "[-] chdir error");
-        exit(EXIT_FAILURE);
-    }
-
-    umask(0);
-    close(STDIN_FILENO);
-    close(STDOUT_FILENO);
-    close(STDERR_FILENO);
-
-    syslog(LOG_NOTICE, "[+] Daemon initialized and detached");
-}
 
 int main() {
     printf("About to daemonsize, /var/log/messages under 'DAEMON'\n");
     openlog("*DAEMON*", LOG_PID, LOG_DAEMON);
     daemonize();
-
     int server_sock = initSocket();
     struct sockaddr_un server_address;
     char buff[108]; // Exact size of sun_path
-
     pathLogSetup(buff, sizeof(buff));
     serverSetup(&server_address);
     bindListen(server_sock, &server_address);
     connectionHandling(server_sock);
     cleanup(server_sock);
-
     return 0;
 }

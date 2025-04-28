@@ -89,9 +89,16 @@ bool sendDataLength(int fd, uint32_t d_len){
     return true;
 }
 bool sendActualData(int fd, void *d, uint32_t d_len){
-    if(send(fd, d, d_len,0) != d_len){
-        syslog(LOG_ERR,"[-]sendActualData() failed to send data\n");
-        return false;
+    uint32_t total_sent = 0;
+    uint8_t *data_ptr = (uint8_t *)d;
+
+    while (total_sent < d_len) {
+        ssize_t sent = send(fd, data_ptr + total_sent, d_len - total_sent, 0);
+        if (sent <= 0) {
+            syslog(LOG_ERR, "[-]sendActualData() failed to send data\n");
+            return false;
+        }
+        total_sent += sent;
     }
     return true;
 }
@@ -179,7 +186,11 @@ uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data
     if(!sendDataLength(sockfd, data_length)){return handleErr(sockfd);}
     if(!sendActualData(sockfd, data, data_length)){return handleErr(sockfd);}  
 
-    uint8_t response = receiveResponse(sockfd);    
+    uint8_t response = receiveResponse(sockfd);   
+    if(response == ALREADY_EXISTS){
+        syslog(LOG_NOTICE,"[!]calling overwriteBlock() on ID: %s", ID);
+        return overwriteBlock(ID, secret, data_length, data);
+    } 
     close(sockfd);
     return response;
     
@@ -230,7 +241,6 @@ uint8_t partialGetBlock(char *ID, uint8_t *secret, void **bufferAccess, uint32_t
     2. Get starting position of text, and the length we want it to end at
     3. Pass in buffer as double pointer
 
-    
     3.a. Pass in buffer address
     3.b. we malloc buffer - allocate it memory dynamically
     3.c. we then store it back in *buffer
@@ -270,4 +280,21 @@ uint8_t partialGetBlock(char *ID, uint8_t *secret, void **bufferAccess, uint32_t
     close(partfd); return SUCCESS;   
 
 }
+uint8_t overwriteBlock(char *ID, uint8_t *secret, uint32_t data_len, void *data){
+    int overfd = connectDaemon();
+    if(overfd < 0){return FAIL;}
 
+    if(!sendOpCode(overfd, (uint8_t)UPDATE)){return handleErr(overfd);}
+
+    if(!sendIDAndLength(overfd, ID, 1)){return handleErr(overfd);}
+    if(!sendIDAndLength(overfd, ID, 2)){return handleErr(overfd);}
+
+    if(!sendSecret(overfd, secret)){return handleErr(overfd);}
+
+    if(!sendDataLength(overfd, data_len)){return handleErr(overfd);}
+
+    if(!sendActualData(overfd, data, data_len)){return handleErr(overfd);}
+
+    uint8_t response = receiveResponse(overfd); close(overfd); return response;
+
+}
