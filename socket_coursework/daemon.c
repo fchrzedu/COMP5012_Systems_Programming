@@ -17,6 +17,7 @@
 #define PARTIAL_GET 2
 #define UPDATE 3
 #define SUCCESS 0
+#define CLOSE 5
 #define FAIL 1
 #define ACCESS_DENIED 2
 #define NOT_FOUND 3
@@ -471,16 +472,15 @@ void connectionHandling(int server_sock) {
     socklen_t client_len;
     uint8_t code; /* OPCODE */
     uint8_t resp; /* STORED RESPONSE FLAG*/
-    int max_clients = 0;
 
-    while (max_clients < 10) {
+    while (1) {
         client_len = sizeof(client_address);
         client_sock = accept(server_sock, (struct sockaddr *)&client_address, &client_len);
 
         if (client_sock < 0) {
             syslog(LOG_ERR, "[-]connectionHandling() Accept() error\n");
             close(client_sock);
-            exit(EXIT_FAILURE);
+            continue; /* needed to keep the daemon listening to other sequential clients */
         }
         syslog(LOG_NOTICE, "[+]Accept() success\n");
 
@@ -489,7 +489,7 @@ void connectionHandling(int server_sock) {
             syslog(LOG_ERR,"[-] failed to read opcode from sharelib\n");
             close(client_sock);
             continue;
-            //exit(EXIT_FAILURE); // change ?? -----------------
+            
 
         }
         syslog(LOG_ERR,"[!] received opcode:%d",code);
@@ -506,13 +506,17 @@ void connectionHandling(int server_sock) {
             case UPDATE:
                 resp = handleOverwriteBlock(client_sock);
                 break;
+            case CLOSE:
+                syslog(LOG_NOTICE,"[!]Closing client (%u) connection\n",client_sock);
+                close(client_sock);
+                break;
             default:
                 syslog(LOG_ERR,"[-] Unknown opcode received: %d",code);
                 send(client_sock, &(uint8_t){FAIL}, sizeof(uint8_t),0);
                 break;                
         }
         close(client_sock);
-        max_clients +=1;        
+        
     }       
 }
 

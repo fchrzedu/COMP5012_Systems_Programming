@@ -89,16 +89,9 @@ bool sendDataLength(int fd, uint32_t d_len){
     return true;
 }
 bool sendActualData(int fd, void *d, uint32_t d_len){
-    uint32_t total_sent = 0;
-    uint8_t *data_ptr = (uint8_t *)d;
-
-    while (total_sent < d_len) {
-        ssize_t sent = send(fd, data_ptr + total_sent, d_len - total_sent, 0);
-        if (sent <= 0) {
-            syslog(LOG_ERR, "[-]sendActualData() failed to send data\n");
-            return false;
-        }
-        total_sent += sent;
+    if(send(fd, d, d_len,0) != d_len){
+        syslog(LOG_ERR,"[-]sendActualData() failed to send data\n");
+        return false;
     }
     return true;
 }
@@ -294,7 +287,6 @@ uint8_t overwriteBlock(char *ID, uint8_t *secret, uint32_t data_len, void *data)
     if(!sendDataLength(overfd, data_len)){return handleErr(overfd);}
 
     if(!sendActualData(overfd, data, data_len)){return handleErr(overfd);}
-
     uint8_t response = receiveResponse(overfd); close(overfd); return response;
 
 }

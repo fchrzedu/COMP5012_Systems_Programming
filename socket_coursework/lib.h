@@ -18,6 +18,7 @@
 #define ACCESS_DENIED 2
 #define NOT_FOUND 3
 #define ALREADY_EXISTS 4
+#define CLOSE 5
 
 int connectDaemon(); // Connnects each client directly to daemon socket
 void logOpen(); // opens logging for each client
@@ -38,6 +39,7 @@ bool receiveActualData(int fd, void *b, uint32_t check_len);
 bool sendBeginText(int fd, uint32_t begin_text);
 bool sendLengthText(int fd, uint32_t length_text);
 bool receivePartData(int fd, void *buff, uint32_t len);
+uint8_t exitSockSession(int fd);
 
 /* --- IPC COMMUNICATION FUNCTIONS ---  */
 uint8_t partialGetBlock(char *ID, uint8_t *secret, void **bufferAccess, uint32_t *begin_text, uint32_t length_text);
