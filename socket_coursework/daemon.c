@@ -49,52 +49,7 @@ DataBlock *head = NULL;
 static DataBlock storage[MAX_STORAGE];
 
 // DEBUGGIN HERE !!
-void logDebugData(const char *id, uint32_t data_length) {
-    FILE *fp = fopen("/tmp/daemon_debug.log", "a");
-    if (fp == NULL) {
-        syslog(LOG_ERR, "[-] Failed to open debug log file\n");
-        return;
-    }
-    else{
-    // Find the matching block in memory (linked list)
-        DataBlock *b = head;
-        while (b != NULL) {
-            if (strncmp(b->ID, id, sizeof(b->ID)) == 0) {
-                break;
-            }
-            b = b->next;
-        }
 
-        if (b == NULL || b->data == NULL) {
-            fprintf(fp, "[-] logDebugData(): No matching data block found for ID='%s'\n", id);
-            fclose(fp);
-            return;
-        }
-
-        // Start logging
-        fprintf(fp, "\n[+] Stored Block Info:\n");
-        fprintf(fp, "ID: %s\n", b->ID);
-        fprintf(fp, "Data Length: %u bytes\n", b->data_length);
-
-        // Log secret in hex
-        fprintf(fp, "Secret: ");
-        for (int i = 0; i < 16; ++i) {
-            fprintf(fp, "%02X", b->secret[i]);
-            if (i < 15) {fprintf(fp, "|");}
-        }
-        fprintf(fp, "\n");
-
-        // Log data as hex for safety (avoid printing raw binary)
-        fprintf(fp, "Data: ");
-        for (uint32_t i = 0; i < b->data_length; ++i) {
-            fprintf(fp, "%02X", b->data[i]);
-            if ((i + 1) % 16 == 0) fprintf(fp, "\n"); // Align next row
-            else if (i < b->data_length - 1) fprintf(fp, " ");
-        }
-        fprintf(fp,"\n");
-        fclose(fp);
-    }
-}
 
 
 /* ---------- DAEMON CLEANUP - DELETED /TMP/ ----------*/
@@ -274,7 +229,6 @@ uint8_t handleSendBlock(int client_sock){
     b->next = head;
     head = b;
 
-    logDebugData(b->ID,b->data_length);
 
     
     return respond(client_sock, SUCCESS);
@@ -453,7 +407,6 @@ uint8_t handleOverwriteBlock(int client_sock){
             block->data = n_data;
             block->data_length = n_data_len;
             syslog(LOG_NOTICE,"[!]handleOverwriteBlock() overwrite for ID:%s",idbuffer);
-            logDebugData(block->ID, block->data_length);
             free(n_data);
             return respond(client_sock, SUCCESS);
 
