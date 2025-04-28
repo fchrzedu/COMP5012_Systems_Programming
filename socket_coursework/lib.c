@@ -230,6 +230,7 @@ uint8_t partialGetBlock(char *ID, uint8_t *secret, void **bufferAccess, uint32_t
     2. Get starting position of text, and the length we want it to end at
     3. Pass in buffer as double pointer
 
+    
     3.a. Pass in buffer address
     3.b. we malloc buffer - allocate it memory dynamically
     3.c. we then store it back in *buffer
