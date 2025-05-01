@@ -10,7 +10,7 @@
 int main() {
     bool has_exit = false;
     while (!has_exit) {
-        printf("\033[H\033[J"); // Clears MINIX and most terminals
+        printf("\033[H\033[J"); /* Clears MINIX and most terminals*/
         clientMenu();
         int user_choice = 0;
         scanf("%d", &user_choice);
