@@ -47,4 +47,13 @@ uint8_t sendNewBlock(char *ID, uint8_t *secret, uint32_t data_length, void *data
 uint8_t getBlock(char *ID, uint8_t *secret, uint32_t buffer_size, void *buffer); // Retreives block from daemon - prints to client
 uint8_t overwriteBlock(char *ID, uint8_t *secret, uint32_t data_len, void *data);
 
+/* --- CLIENT HELPER FUNCTIONS --- */
+void clientMenu();
+void readClientSecret(uint8_t *s);
+void readClientID(char *id, size_t size);
+void readClientData(char *data, size_t size);
+void handleClientResponse(uint8_t resp, const char *successMsg, const char *failureMsg);
+bool isValidSecret(const char *input);
+void readClientSecret(uint8_t *s);
+
 #endif // LIB_H

@@ -26,7 +26,7 @@
 #define SOCKET_PATH "/tmp/domainsocket"
 #define MAX_STORAGE 50  // Max number of blocks to store
 
-/* ----- PERMISSION AND SECRETS (un-implemented) -----*/
+/* ----- PERMISSION AND SECRETS (un-implemented, left for future as template) -----*/
 typedef struct Permission{
     uint8_t secret[16];
     int perm;
@@ -54,8 +54,20 @@ static DataBlock storage[MAX_STORAGE];
 void cleanup(int server_sock) {
     close(server_sock);
     unlink(SOCKET_PATH);
+
+    // Free all DataBlocks in the linked list
+    DataBlock *current = head;
+    while (current != NULL) {
+        DataBlock *next = current->next;
+        free(current->data); // Free the data pointer
+        current->data = NULL;
+        current->next = NULL;
+        current = next;
+    }
+    head = NULL;
+
+    syslog(LOG_NOTICE, "[+] Daemon shutdown and memory freed\n");
     closelog();
-    syslog(LOG_NOTICE, "[+] Daemon shutdown");
     exit(EXIT_SUCCESS);
 }
 /* ---------- CREATES SERVER SOCKET ----------*/
@@ -201,6 +213,7 @@ uint8_t handleSendBlock(int client_sock){
                 syslog(LOG_ERR,"[-]handleSendBlock() failed to receive secret\n");
                 return respond(client_sock,FAIL);
             }
+            
             if(memcmp(currentptr->secret, secret, 16) == 0){
                 syslog(LOG_NOTICE,"[!]handleSendBlock() duplicate ID & secret - please overwrite \n");
                 return respond(client_sock, ALREADY_EXISTS);

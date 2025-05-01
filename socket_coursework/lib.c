@@ -7,6 +7,7 @@
 #include <sys/un.h>
 #include <syslog.h>
 #include <stdbool.h>
+#include <ctype.h>
 #include "lib.h"
 
 #define LOG_FILE_PATH "/tmp/lib.txt"
@@ -299,4 +300,77 @@ uint8_t overwriteBlock(char *ID, uint8_t *secret, uint32_t data_len, void *data)
     if(!sendActualData(overfd, data, data_len)){return handleErr(overfd);}
     uint8_t response = receiveResponse(overfd); close(overfd); return response;
 
+}
+
+void clientMenu() {
+    printf("[1] Send new block to server\n");
+    printf("[2] Update an existing block's payload\n");
+    printf("[3] Retrieve partial payload from a block\n");
+    printf("[4] Retrieve a block's whole data payload\n");
+    printf("[5] Disconnect from the server\n");
+    printf("Enter your choice as number> ");
+}
+
+bool isValidSecret(const char *input) {
+    int sec_len = strlen(input);
+    int counter = 0;
+
+    for (int i = 0; i < sec_len; i++) {
+        if (isxdigit(input[i])) {
+            // Valid hex digit
+            continue;
+        } else if (input[i] == ' ') {
+            // Valid space between hex pairs
+            counter++;
+        } else {
+            return false; // Invalid character
+        }
+    }
+
+    // Ensure there are exactly 15 spaces (16 bytes) and no trailing space
+    return counter == 15 && input[sec_len - 1] != ' ';
+}
+
+void readClientSecret(uint8_t *s) {
+    char sec_input[64] = {0}; // Buffer to hold input
+    bool valid = false;
+
+    while (!valid) {
+        printf("Secret must be 16 bytes long, where each is a 2-character hexadecimal separated by whitespace\n");
+        printf("Enter secret> ");
+        fgets(sec_input, sizeof(sec_input), stdin);
+        sec_input[strcspn(sec_input, "\n")] = '\0'; // Remove newline character
+
+        if (isValidSecret(sec_input)) {
+            valid = true; // Input is valid, exit loop
+            // Parse the valid secret into the uint8_t array
+            char *tok = strtok(sec_input, " ");
+            for (int i = 0; i < 16 && tok != NULL; i++) {
+                sscanf(tok, "%hhx", &s[i]);
+                tok = strtok(NULL, " ");
+            }
+        } else {
+            printf("[-] Invalid secret format. Please try again.\n");
+        }
+    }
+}
+
+void readClientID(char *id, size_t size) {
+    printf("Enter ID> ");
+    fgets(id, size, stdin);
+    id[strcspn(id, "\n")] = '\0'; // Null-terminate ID
+}
+
+void readClientData(char *data, size_t size) {
+    printf("Enter data> ");
+    fgets(data, size, stdin);
+    data[strcspn(data, "\n")] = '\0'; // Null-terminate data
+}
+
+void handleClientResponse(uint8_t resp, const char *successMsg, const char *failureMsg) {
+    if (resp == SUCCESS) {
+        printf("[+] %s\n", successMsg);
+    } else {
+        printf("[-] %s\n", failureMsg);
+    }
 }

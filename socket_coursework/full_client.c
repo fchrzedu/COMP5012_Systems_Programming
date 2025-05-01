@@ -3,125 +3,90 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include "lib.h"
 
-// display the menu options
-void menu() {
-    printf("1. Send new block\n");
-    printf("2. Update an existing block\n");
-    printf("3. Retrieve partial information about a block\n");
-    printf("4. Retrieve a whole block's data\n");
-    printf("5. Exit\n");
-    printf("Enter your choice> ");
-}
-
-// sends secret in hexadecimal bytes
-void readSecret(uint8_t *secret) {
-    printf("Enter secret (16 bytes as hex, separated by spaces)> ");
-    for (int i = 0; i < 16; i++) {
-        scanf("%hhx", &secret[i]);
-    }
-    getchar(); 
-}
 
 int main() {
-    while (1) {
-        printf("\033[H\033[J"); // clears MINIX terminal screen (system("cls") doesn't work)
-        int choice;
-        menu();
-        scanf("%d", &choice);
-        getchar(); 
+    bool has_exit = false;
+    while (!has_exit) {
+        printf("\033[H\033[J"); // Clears MINIX and most terminals
+        clientMenu();
+        int user_choice = 0;
+        scanf("%d", &user_choice);
+        getchar(); // Clears buffer for \0
 
         char id[256] = {0};
         uint8_t secret[16] = {0};
         char data[512] = {0};
         uint32_t data_length = 0;
 
-        switch (choice) {
-            case 1: // sendNewBlock
-                printf("Enter ID: ");
-                fgets(id, sizeof(id), stdin); id[strcspn(id, "\n")] = '\0';
-                readSecret(secret);
-                printf("Enter data: ");
-                fgets(data, sizeof(data), stdin); data[strcspn(data, "\n")] = '\0';
+        switch (user_choice) {
+            case 1: // sendNewBlock()
+                readClientID(id, sizeof(id));
+                readClientSecret(secret);
+                readClientData(data, sizeof(data));
                 data_length = strlen(data);
-
-                uint8_t response = sendNewBlock(id, secret, data_length, data);
-                if (response == SUCCESS) {
-                    printf("[+] Block added successfully.\n");
-                } else if (response == ALREADY_EXISTS) {
-                    printf("[!] Block with the same ID and secret already exists.\n");
-                    printf("[!] Please go back and select the option [2].\n");
-                } else {
-                    printf("[-] Failed to add block.\n");
-                }
+                uint8_t resp = sendNewBlock(id, secret, data_length, data);
+                handleClientResponse(resp, "Block added successfully.", "Failed to add block.");
                 sleep(2);
                 break;
 
-            case 2: // overwriteBlock
-                printf("Enter ID: ");
-                fgets(id, sizeof(id), stdin);id[strcspn(id, "\n")] = '\0';
-
-                readSecret(secret);
-
-                printf("Enter new data: ");
-                fgets(data, sizeof(data), stdin);
-                data[strcspn(data, "\n")] = '\0';
+            case 2: // overwriteBlock()
+                readClientID(id, sizeof(id));
+                readClientSecret(secret);
+                readClientData(data, sizeof(data));
                 data_length = strlen(data);
-
-                if (overwriteBlock(id, secret, data_length, data) == SUCCESS) {
-                    printf("[+] Block updated successfully.\n");
-                } else {
-                    printf("[-] Failed to update block.\n");
-                }
+                resp = overwriteBlock(id, secret, data_length, data);
+                handleClientResponse(resp, "Block updated successfully.", "Failed to update block.");
                 sleep(2);
                 break;
 
-            case 3: // partialGetBlock
-                printf("Enter ID: ");
-                fgets(id, sizeof(id), stdin);
-                id[strcspn(id, "\n")] = '\0';
+            case 3: // partialGetBlock()
+                readClientID(id, sizeof(id));
+                readClientSecret(secret);
 
-                readSecret(secret);
-
-                uint32_t begin_text, length_text;
-                printf("Enter starting offset: ");
-                scanf("%u", &begin_text);
-                printf("Enter length of data to retrieve: ");
+                uint32_t begin_text_offset, length_text = 0;
+                printf("Enter integer offset to start at> ");
+                scanf("%u", &begin_text_offset);
+                printf("Enter length of data to retrieve> ");
                 scanf("%u", &length_text);
-                getchar(); // Consume the newline character
+                getchar();
 
-                char *partial_data = NULL;
-                if (partialGetBlock(id, secret, (void **)&partial_data, &begin_text, length_text) == SUCCESS) {
-                    printf("[+] Partial data retrieved: %s\n", partial_data);
-                    free(partial_data);
+                char *partial_payload = NULL;
+                resp = partialGetBlock(id, secret, (void **)&partial_payload, &begin_text_offset, length_text);
+
+                if (resp == SUCCESS) {
+                    printf("[+] Partial data received: %s\n", partial_payload);
+                    free(partial_payload);
                 } else {
-                    printf("[-] Failed to retrieve partial data.\n");
+                    printf("[-] Failed to receive partial data for ID: %s\n", id);
                 }
                 sleep(2);
                 break;
 
-            case 4: // getBlock
-                printf("Enter ID: ");
-                fgets(id, sizeof(id), stdin);
-                id[strcspn(id, "\n")] = '\0';
+            case 4: // getBlock()
+                readClientID(id, sizeof(id));
+                readClientSecret(secret);
 
-                readSecret(secret);
-
-                char buffer[1024];
-                if (getBlock(id, secret, sizeof(buffer), buffer) == SUCCESS) {
-                    printf("[+] Full data retrieved: %s\n", buffer);
+                char idbuff[256] = {0};
+                resp = getBlock(id, secret, sizeof(idbuff), idbuff);
+                if (resp == SUCCESS) {
+                    printf("[+] Data retrieved successfully: %s\n", idbuff);
                 } else {
-                    printf("[-] Failed to retrieve full data.\n");
+                    printf("[-] Failed to retrieve data.\n");
                 }
                 sleep(2);
                 break;
 
-            case 5: // Exit
-                printf("[+] Exiting client.\n");
-                return 0;
+            case 5: // Disconnect
+                printf("[!] Disconnecting client\n");
+                sleep(2);
+                has_exit = true;
+                break;
+
             default:
-                printf("[-] Invalid choice. Please try again.\n");
+                printf("Please enter a valid choice, it must be a number from the menu\n");
                 sleep(2);
                 break;
         }
