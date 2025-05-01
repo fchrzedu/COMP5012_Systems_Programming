@@ -15,7 +15,7 @@
 #define GET 1
 #define PARTIAL_GET 2
 #define UPDATE 3
-/* response codes */
+/* REPONSE CODES */
 #define SUCCESS 0
 #define CLOSE 5
 #define FAIL 1
@@ -23,6 +23,7 @@
 #define NOT_FOUND 3
 #define ALREADY_EXISTS 4
 
+/* CONSTANTS */
 #define SOCKET_PATH "/tmp/domainsocket"
 #define MAX_STORAGE 50  // Max number of blocks to store
 
@@ -32,7 +33,7 @@ typedef struct Permission{
     int perm;
     struct Permission *next;
 } Permission;
-/* ----- DATA STORAGE ----- */
+/* ----- DATA STORAGE BLOCK ----- */
 typedef struct DataBlock{
     char ID[256];
     uint8_t secret[16];
@@ -45,7 +46,7 @@ typedef struct DataBlock{
     struct DataBlock *next;
 }DataBlock;
 
-DataBlock *head = NULL;
+DataBlock *head = NULL; /* global head pointer variable */
 static DataBlock storage[MAX_STORAGE];
 
 
@@ -71,11 +72,10 @@ void cleanup(int server_sock) {
     exit(EXIT_SUCCESS);
 }
 /* ---------- CREATES SERVER SOCKET ----------*/
-
 int initSocket() {
     int server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if (server_sock < 0) {
-        syslog(LOG_ERR, "[-]initSocket() Server socket creation failed!\n");
+        syslog(LOG_ERR, "[-] initSocket() server socket creation failed!\n");
         exit(EXIT_FAILURE);
     }
     syslog(LOG_NOTICE, "[+] socket() done");
@@ -84,10 +84,10 @@ int initSocket() {
 /* ---------- DAEMONIZES ----------*/
 void daemonize() {
     pid_t pid, sid;
-    /* forks current session, deattaches itself from terminal & std(in/out)*/
+    /* forks current session, deattaches itself from terminal & std(in/out) redirecting to root */
     pid = fork();
     if (pid < 0) {
-        syslog(LOG_ERR, "[-] Forking error");
+        syslog(LOG_ERR, "[-] fork() error");
         exit(EXIT_FAILURE);
     }
     if (pid > 0) {
@@ -96,13 +96,14 @@ void daemonize() {
 
     sid = setsid();
     if (sid < 0) {
-        syslog(LOG_ERR, "[-] setsid error");
+        syslog(LOG_ERR, "[-] setsid() error");
         exit(EXIT_FAILURE);
     }
 
     if (chdir("/") < 0) {
-        syslog(LOG_ERR, "[-] chdir error");
-        exit(EXIT_FAILURE);    }
+        syslog(LOG_ERR, "[-] chdir() error");
+        exit(EXIT_FAILURE);
+    }
 
     umask(0);
     close(STDIN_FILENO);
@@ -110,23 +111,25 @@ void daemonize() {
     close(STDERR_FILENO);
     syslog(LOG_NOTICE, "[+] Daemon initialized and detached");
 }
-void pathLogSetup(char *buff, size_t buff_size) {
-    /* copies socket path to the daemon */
+/* ---------- COPIES SOCKET_PATH TO SERVER  ----------*/
+void pathLogSetup(char *buff, size_t buff_size) {    
     memset(buff, 0, buff_size);
     strncpy(buff, SOCKET_PATH, buff_size - 1); 
 }
 /* ---------- SERVER ADDRESS SETUP ----------*/
 void serverSetup(struct sockaddr_un *server_address) {
-    /* clears server structure (pre-caution), sets it to UNIX socket family
-    Copies the server sun path address */
+    /* 
+    clears server structure (pre-caution), sets it to AF_UNIX socket family
+    Copies the server sun path address 
+    */
     memset(server_address, 0, sizeof(struct sockaddr_un)); // Clear struct
     (*server_address).sun_family = AF_UNIX; // Set socket family
     strncpy((*server_address).sun_path, SOCKET_PATH, sizeof((*server_address).sun_path) - 1); // Copy path
-    syslog(LOG_NOTICE, "[+] Memset worked");
+    syslog(LOG_NOTICE, "[+] Memset() worked");
 }
 /* ---------- BIND() & LISTEN() ----------*/
 void bindListen(int server_sock, struct sockaddr_un *server_address) {
-    /* removes any existing socket /tmp files - proceeds to bind to server and listens for maximum 10 clients */
+    /* removes any existing socket /tmp/ files - proceeds to bind to server and listens for maximum 10 clients */
     unlink(SOCKET_PATH); 
     if (bind(server_sock, (struct sockaddr *)server_address, sizeof(struct sockaddr_un)) == -1) {
         syslog(LOG_ERR, "[-]bindListen() Bind() error\n");
@@ -136,13 +139,19 @@ void bindListen(int server_sock, struct sockaddr_un *server_address) {
     syslog(LOG_NOTICE, "[+] Bind() success\n");
     listen(server_sock, 10); 
 }
-
+/* ---------- HELPER: CLIENT RESPONSE CODE ----------*/
 uint8_t respond(int fd, uint8_t r){
     /* -- sends response to client --*/
     send(fd,&r,sizeof(r),0);
     return r;
 }
+/* ---------- HELPER: RECEIVES ALL DATA ----------*/
 bool receiveAll(int sfd, void *b, size_t len){
+    /*
+    loops through data length
+    increments counter and matches whether == data length
+    (sometimes send() may not send all data at once, but rather in chunks) 
+    */
     size_t tot = 0; ssize_t received = 0;
     while(tot<len){
         received = recv(sfd, (char*)b + tot, len - tot, 0);
@@ -153,7 +162,13 @@ bool receiveAll(int sfd, void *b, size_t len){
     }
     return true;
 }
+/* ---------- HELPER: SENDS ALL DATA ----------*/
 bool sendAll(int sfd, const void *b, size_t len){
+    /*
+    loops through data length
+    increments counter and matches whether == data length
+    (sometimes recv() may not receive all data at once, but rather in chunks) 
+    */
     size_t tot = 0; ssize_t sent = 0;
     while(tot < len){
         sent = send(sfd, (const char*)b + tot, len - tot, 0);
@@ -162,6 +177,7 @@ bool sendAll(int sfd, const void *b, size_t len){
     }
     return true;
 }
+/* ---------- HELPER FUNCTIONS CHECKING ALL DATA ----------*/
 bool isValid(const char *id, uint8_t id_len, const uint8_t *sec, uint32_t data_len,const uint8_t *data ){
     /* check whether ID & it's length are within bounds. Same for secret, data and data length*/
     if(id_len < 0 || id_len > 255 ){
@@ -190,8 +206,9 @@ bool isValid(const char *id, uint8_t id_len, const uint8_t *sec, uint32_t data_l
     return true;
 
 }
+/* ---------- HANDLES lib.c::sendNewBlock()*/
 uint8_t handleSendBlock(int client_sock){
-   /* get ID and it's length */
+    /* - get ID and its length - */
     uint8_t id_len = 0;    
     if(!receiveAll(client_sock, &id_len, sizeof(id_len))){
         syslog(LOG_ERR,"[-]handleSendBlock() failed to receive id length\n");
@@ -202,18 +219,19 @@ uint8_t handleSendBlock(int client_sock){
         syslog(LOG_ERR,"[-]handleSendBlock() failed to receive ID\n");
         return respond(client_sock,FAIL);
     }
-    idbuffer[id_len] = '\0'; // end of string
+    idbuffer[id_len] = '\0'; // null terminate end of string
 
-    /* check dupplicate ID*/
+    /* check duplicate ID for overwriting, same for secret*/
     DataBlock *currentptr = head;
     while(currentptr != NULL){
+        /* compare stored ID passed in ID . == 0 means no inconcistencies */
         if (strncmp(currentptr->ID, idbuffer, sizeof(currentptr->ID)) == 0) {
             uint8_t secret[16] = {0};
             if(!receiveAll(client_sock, secret, 16)){
                 syslog(LOG_ERR,"[-]handleSendBlock() failed to receive secret\n");
                 return respond(client_sock,FAIL);
             }
-            
+            /* compares input and stored secret byte by byte*/
             if(memcmp(currentptr->secret, secret, 16) == 0){
                 syslog(LOG_NOTICE,"[!]handleSendBlock() duplicate ID & secret - please overwrite \n");
                 return respond(client_sock, ALREADY_EXISTS);
@@ -240,7 +258,7 @@ uint8_t handleSendBlock(int client_sock){
         return respond(client_sock,FAIL);
     }
     
-    /* - receive data - */
+    /* - allocate buffer for size of data, then receive data and store - */
     uint8_t *data = malloc(data_length);
     if(!data){
         syslog(LOG_ERR,"[-]handleSendBlock() failed to malloc for data_length\n");
@@ -252,6 +270,7 @@ uint8_t handleSendBlock(int client_sock){
         free(data);
         return respond(client_sock,FAIL);
     }
+    /* - check whether all input arguments are valid (extra precaution considering lib.c client check helper methods) - */
     if(!isValid(idbuffer, id_len, secret, data_length, data)){free(data);return respond(client_sock, FAIL);}
     /* - allocate linked pointer storage block -*/
     DataBlock *b = NULL;
@@ -273,24 +292,19 @@ uint8_t handleSendBlock(int client_sock){
     b->data = data;
     b->data_length = data_length;
     b->next = head;
-    head = b;
-
-
-    
+    head = b;    
     return respond(client_sock, SUCCESS);
-    
-
 
 }
-
+/* ----------- HANDLES lib.c::getBlock() ----------*/
 uint8_t handleGetBlock(int client_sock){ 
-
+    /* - recv ID length - */
     uint8_t id_len = 0;
     if(!receiveAll(client_sock, &id_len, sizeof(id_len))){
         syslog(LOG_ERR,"[-]handleGetBlock() failed to receive ID length\n");
         return respond(client_sock, FAIL);
     }        
-    /* -- recv id -- */
+    /* -- recv ID -- */
     char idbuffer[256] = {0};
     if(!receiveAll(client_sock, idbuffer, id_len)){
         syslog(LOG_ERR,"[-]handleGetBlock() failed to receive ID\n");
@@ -335,13 +349,14 @@ uint8_t handleGetBlock(int client_sock){
     
 
 }
+/* ---------- HANDLES lib.c::getPartialBlock() ----------*/
 uint8_t handlePartialGetBlock(int client_sock){
     uint8_t id_len = 0;
     char idbuff[256] = {0}; 
     uint8_t secret[16] = {0};
     uint32_t begin_text_offset = 0;
     uint32_t len_text = 0;
-    // receive ID and length
+    /* - receive ID length and ID - */
     if(!receiveAll(client_sock, &id_len, sizeof(id_len))){
         syslog(LOG_ERR, "[-]handlePartialGetBlock() failed to receive ID length\n");
         return respond(client_sock, FAIL);
@@ -350,12 +365,12 @@ uint8_t handlePartialGetBlock(int client_sock){
         syslog(LOG_ERR,"[-]handlePartialGetBlock() failed to receive ID tag\n");
         return respond(client_sock, FAIL);
     } 
-    // receive secret
+    /* - receive secret - */
     if(!receiveAll(client_sock, secret, 16)){
         syslog(LOG_ERR,"[-]handlePartialGetBlock() failed to receive secret\n");
         return respond(client_sock, FAIL);
     }
-    //receive offset and length
+    /* - receive starting offset & length - */
     if(!receiveAll(client_sock, &begin_text_offset, sizeof(begin_text_offset))){
         syslog(LOG_ERR,"[-]handlePartialGetBlock() failed to receive begin_text_offset\n");
         return respond(client_sock, FAIL);
@@ -406,12 +421,13 @@ uint8_t handlePartialGetBlock(int client_sock){
     return respond(client_sock, NOT_FOUND);   
 
 }
+/* ---------- HANDLES lib.c::overwriteBlock() ---------*/
 uint8_t handleOverwriteBlock(int client_sock){
     uint8_t id_len = 0;
     char idbuffer[256] = {0};
     uint8_t secret[16] = {0};
     uint32_t n_data_len = 0; /* different 'data' = different size*/
-    
+    /* - receive ID length with ID - */
     if(!receiveAll(client_sock, &id_len, sizeof(id_len))){
         syslog(LOG_ERR,"[-]handleOverwriteBlock() failed to receive ID length\n");
         return respond(client_sock, FAIL);
@@ -421,17 +437,17 @@ uint8_t handleOverwriteBlock(int client_sock){
         syslog(LOG_ERR,"[-]handleOverwriteBlock() failed to receive ID\n");
         return respond(client_sock, FAIL);
     }
-
+    /* - receive secret - */
     if(!receiveAll(client_sock, secret, 16)){
         syslog(LOG_ERR,"[-]handleOverwriteBlock() failed to receive secret\n");
         return respond(client_sock, FAIL);
     }
-
+    /* - receive data length followed by data- */
     if (!receiveAll(client_sock, &n_data_len, sizeof(n_data_len))) {
         syslog(LOG_ERR, "[-]handleOverwriteBlock() failed to receive new data length\n");
         return respond(client_sock, FAIL);
     }
-    
+    /* - allocate new data buffer, free old - */
     uint8_t *n_data = malloc(n_data_len);
     if(!n_data){
         syslog(LOG_ERR, "[-]handleOverwriteBlock() failed to malloc mem for data\n");
@@ -441,12 +457,13 @@ uint8_t handleOverwriteBlock(int client_sock){
         syslog(LOG_ERR, "[-]handleOverwriteBlock() failed to receive new data \n");
         return respond(client_sock, FAIL);
     }
-    // Validate inputs
+    /* - valiate inputs - */
     if (!isValid(idbuffer, id_len, secret, n_data_len, n_data)) {
         free(n_data);
         return respond(client_sock, FAIL);
     }
 
+    /* - iterate through all variables, check whether ID's and secrets match - */
     DataBlock *block = head;
     while(block != NULL){
         if(strncmp(block->ID, idbuffer, sizeof(block->ID)) == 0){
@@ -455,6 +472,7 @@ uint8_t handleOverwriteBlock(int client_sock){
                 free(n_data);
                 return respond(client_sock, ACCESS_DENIED);
             }
+            /* - if secret == ID, replace old ata with new and free old data -*/
             free(block->data);
             block->data = n_data;
             block->data_length = n_data_len;

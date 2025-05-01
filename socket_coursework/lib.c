@@ -1,5 +1,4 @@
 #include <stdio.h>
-
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -12,7 +11,12 @@
 
 #define LOG_FILE_PATH "/tmp/lib.txt"
 /* -- client -> lib -> socket -> daemon -- */
+/* all methods and functions are commented in header file - hence minimal here*/
+
+
 int connectDaemon(){
+    /* establishes socket connection to daemon
+    creates client struct, and connects to daemon*/
     logOpen();
     struct sockaddr_un address;
     int sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -47,10 +51,7 @@ bool sendOpCode(int fd, uint8_t opcode){
     }
     return true;
 }
-bool sendIDAndLength(int fd, char*ID, int flag){
-    /*
-    flag = 1 : send ID length
-    flag = 2: send ID*/
+bool sendIDAndLength(int fd, char*ID, int flag){    
     if(flag == 1){
         uint8_t id_l = strlen(ID);
         if(send(fd, &id_l, sizeof(id_l), 0) != sizeof(id_l)){
@@ -59,8 +60,7 @@ bool sendIDAndLength(int fd, char*ID, int flag){
         }
     }
     else if (flag == 2){
-        uint8_t id_l = strlen(ID);
-        
+        uint8_t id_l = strlen(ID);        
         if(send(fd, ID, id_l,0) != id_l){
             syslog(LOG_ERR,"[-]sendIDAndLength() failed to send ID\n");
             return false;
@@ -70,8 +70,7 @@ bool sendIDAndLength(int fd, char*ID, int flag){
     else{
         syslog(LOG_ERR,"[-]lib.c::sendIDAndLength unrecognised flag: %u", flag);
         return false;
-    }
-    
+    }    
     return true;
 }
 bool sendSecret(int fd, uint8_t *secret){
@@ -312,16 +311,18 @@ void clientMenu() {
 }
 
 bool isValidSecret(const char *input) {
+    /* iterates through size of secret (input)
+    each 2 char element is checked for hex - isxdigit()
+    spaces are checked*/
     int sec_len = strlen(input);
     int counter = 0;
 
     for (int i = 0; i < sec_len; i++) {
         if (isxdigit(input[i])) {
-            // Valid hex digit
-            continue;
+            /* check element is hex */
         } else if (input[i] == ' ') {
-            // Valid space between hex pairs
-            counter++;
+            /* check element is space */
+            counter++; // increment to point to next element in unit8_t secret[16]
         } else {
             return false; // Invalid character
         }
@@ -332,18 +333,19 @@ bool isValidSecret(const char *input) {
 }
 
 void readClientSecret(uint8_t *s) {
-    char sec_input[64] = {0}; // Buffer to hold input
+    char sec_input[64] = {0}; // buffer to hold input - safe to allocate more as below only 16 elements are allowed
     bool valid = false;
 
     while (!valid) {
         printf("Secret must be 16 bytes long, where each is a 2-character hexadecimal separated by whitespace\n");
         printf("Enter secret> ");
+        /* store secret in sec_input*/
         fgets(sec_input, sizeof(sec_input), stdin);
-        sec_input[strcspn(sec_input, "\n")] = '\0'; // Remove newline character
+        sec_input[strcspn(sec_input, "\n")] = '\0'; /* null terminate end of sec_input*/
 
         if (isValidSecret(sec_input)) {
-            valid = true; // Input is valid, exit loop
-            // Parse the valid secret into the uint8_t array
+            valid = true; 
+            /* convert elements into hex, check whether empty and replace index in secret with hex */
             char *tok = strtok(sec_input, " ");
             for (int i = 0; i < 16 && tok != NULL; i++) {
                 sscanf(tok, "%hhx", &s[i]);
@@ -358,13 +360,13 @@ void readClientSecret(uint8_t *s) {
 void readClientID(char *id, size_t size) {
     printf("Enter ID> ");
     fgets(id, size, stdin);
-    id[strcspn(id, "\n")] = '\0'; // Null-terminate ID
+    id[strcspn(id, "\n")] = '\0'; /* null terminate ID*/
 }
 
 void readClientData(char *data, size_t size) {
     printf("Enter data> ");
     fgets(data, size, stdin);
-    data[strcspn(data, "\n")] = '\0'; // Null-terminate data
+    data[strcspn(data, "\n")] = '\0'; /* null terminate data*/
 }
 
 void handleClientResponse(uint8_t resp, const char *successMsg, const char *failureMsg) {
